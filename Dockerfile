@@ -45,7 +45,8 @@ COPY --from=build /src/apps/server/package.json apps/server/
 COPY --from=build /src/apps/server/dist apps/server/dist
 COPY --from=build /src/apps/web/dist apps/web/dist
 COPY docker/entrypoint.sh /usr/local/bin/fieldplan-entrypoint
-RUN chmod 755 /usr/local/bin/fieldplan-entrypoint && mkdir -p /data
+RUN chmod 755 /usr/local/bin/fieldplan-entrypoint && mkdir -p /data \
+ && mkdir -p node_modules/@fieldplan && ln -sfn ../../packages/shared node_modules/@fieldplan/shared
 VOLUME /data
 EXPOSE 8080
 HEALTHCHECK --interval=30s --timeout=5s --start-period=20s --retries=3 \
