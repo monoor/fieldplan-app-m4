@@ -27,9 +27,9 @@ jobs:
           node-version: 24
           cache: npm
       - run: npm ci --no-audit --no-fund
+      - run: npm run build        # first: server and tests import the built @fieldplan/shared
       - run: npm run typecheck
       - run: npm test
-      - run: npm run build
 
   image:
     needs: test
