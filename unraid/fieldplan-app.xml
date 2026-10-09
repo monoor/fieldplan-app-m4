@@ -1,0 +1,34 @@
+<?xml version="1.0"?>
+<Container version="2">
+  <Name>fieldplan-app</Name>
+  <Repository>ghcr.io/monoor/fieldplan-app:latest</Repository>
+  <Registry>https://github.com/users/monoor/packages/container/package/fieldplan-app</Registry>
+  <Network>bridge</Network>
+  <MyIP/>
+  <Shell>sh</Shell>
+  <Privileged>false</Privileged>
+  <Support/>
+  <Project>https://github.com/monoor/fieldplan-app</Project>
+  <Overview>Fieldplan v2 — site CAD for low-voltage, electrical, security and smart-home installs, with user accounts, client share links, an audit log and a device catalog that imports products from vendor pages. Everything is stored in /data (SQLite database, uploaded files, auth secret) — back that folder up. Runs next to Fieldplan v1 on a different port. Open the Web UI once after the first start to create the admin account.</Overview>
+  <Category>Productivity: Tools:</Category>
+  <WebUI>http://[IP]:[PORT:8080]/</WebUI>
+  <TemplateURL/>
+  <Icon/>
+  <ExtraParams>--security-opt no-new-privileges:true</ExtraParams>
+  <PostArgs/>
+  <CPUset/>
+  <DonateText/>
+  <DonateLink/>
+  <Requires/>
+  <Config Name="Web UI port" Target="8080" Default="8096" Mode="tcp" Description="Host port for the web interface (v1 uses 8095)" Type="Port" Display="always" Required="true" Mask="false">8096</Config>
+  <Config Name="Data" Target="/data" Default="/mnt/user/appdata/fieldplan-app" Mode="rw" Description="Database, uploaded files and the sign-in secret. Back this up." Type="Path" Display="always" Required="true" Mask="false">/mnt/user/appdata/fieldplan-app</Config>
+  <Config Name="Anthropic API key" Target="ANTHROPIC_API_KEY" Default="" Mode="" Description="Optional. Lets Claude read product pages and datasheet PDFs during catalog import. Leave empty to turn this off." Type="Variable" Display="always" Required="false" Mask="true"/>
+  <Config Name="Public URL" Target="PUBLIC_URL" Default="" Mode="" Description="Only when served through a reverse proxy, e.g. https://plans.example.com (no trailing slash). Leave empty for LAN use." Type="Variable" Display="always" Required="false" Mask="false"/>
+  <Config Name="Trust proxy" Target="TRUST_PROXY" Default="" Mode="" Description="Number of reverse proxies in front (usually 1) so client IPs in the audit log are right. Leave empty for LAN use." Type="Variable" Display="advanced" Required="false" Mask="false"/>
+  <Config Name="Claude model" Target="CLAUDE_MODEL" Default="claude-sonnet-5-5" Mode="" Description="Model used for imports; can also be changed in Settings" Type="Variable" Display="advanced" Required="false" Mask="false">claude-sonnet-5-5</Config>
+  <Config Name="Claude daily limit" Target="CLAUDE_DAILY_LIMIT" Default="200" Mode="" Description="Most Claude calls per day (protects API credits); can also be changed in Settings" Type="Variable" Display="advanced" Required="false" Mask="false">200</Config>
+  <Config Name="Allowed import sites" Target="IMPORT_ALLOWED_DOMAINS" Default="" Mode="" Description="Comma-separated domains imports may fetch from, e.g. ui.com,reolink.com. Empty = any public site." Type="Variable" Display="advanced" Required="false" Mask="false"/>
+  <Config Name="Max upload (MB)" Target="MAX_UPLOAD_MB" Default="50" Mode="" Description="Largest file upload (underlays, datasheets)" Type="Variable" Display="advanced" Required="false" Mask="false">50</Config>
+  <Config Name="PUID" Target="PUID" Default="99" Mode="" Description="Owner of files written to /data" Type="Variable" Display="advanced" Required="true" Mask="false">99</Config>
+  <Config Name="PGID" Target="PGID" Default="100" Mode="" Description="Group of files written to /data" Type="Variable" Display="advanced" Required="true" Mask="false">100</Config>
+</Container>

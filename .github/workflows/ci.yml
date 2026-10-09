@@ -1,0 +1,118 @@
+# Type-checks and tests every push and PR. On main (and v* tags) it also builds the Docker image, starts it once as a
+# smoke test, and pushes it to ghcr.io/monoor/fieldplan-app — the image the Unraid template pulls.
+name: ci
+
+on:
+  push:
+    branches: [main]
+    tags: ["v*"]
+    paths-ignore: ["**/*.md", "unraid/**"]
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-node@v6
+        with:
+          node-version: 24
+          cache: npm
+      - run: npm ci --no-audit --no-fund
+      - run: npm run typecheck
+      - run: npm test
+      - run: npm run build
+
+  image:
+    needs: test
+    if: github.event_name != 'pull_request'
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      packages: write
+    env:
+      # AWS's copy of the Docker official image: avoids Docker Hub's login service and pull limits.
+      NODE_IMAGE: public.ecr.aws/docker/library/node:24-alpine
+    steps:
+      - uses: actions/checkout@v7
+
+      - uses: docker/setup-buildx-action@v4
+
+      # 2026.10.09-abc1234 for main, 2.1.0 for a v2.1.0 tag — shown in the app footer and container log.
+      - id: ver
+        run: |
+          if [ "$GITHUB_REF_TYPE" = tag ]; then v="${GITHUB_REF_NAME#v}"; else v="$(date -u +%Y.%m.%d)-${GITHUB_SHA::7}"; fi
+          echo "v=$v" >> "$GITHUB_OUTPUT"
+
+      - name: Build image (amd64, for the smoke test)
+        uses: docker/build-push-action@v7
+        with:
+          context: .
+          platforms: linux/amd64
+          load: true
+          tags: fieldplan-app:ci
+          build-args: |
+            NODE_IMAGE=${{ env.NODE_IMAGE }}
+            FIELDPLAN_VERSION=${{ steps.ver.outputs.v }}
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+
+      - name: Smoke test (read-only root, Unraid-style PUID/PGID)
+        run: |
+          set -eu
+          data="$RUNNER_TEMP/fpdata"; mkdir -p "$data"
+          docker run -d --name fp -p 8080:8080 -e PUID=99 -e PGID=100 -e CLAUDE_MODEL= -e PUBLIC_URL= \
+            --health-interval 5s --read-only --tmpfs /tmp --security-opt no-new-privileges:true \
+            --cap-drop ALL --cap-add CHOWN --cap-add SETUID --cap-add SETGID --cap-add DAC_OVERRIDE \
+            -v "$data:/data" fieldplan-app:ci
+          for i in $(seq 1 40); do curl -fsS localhost:8080/healthz >/dev/null 2>&1 && break; sleep 1; done
+          docker logs fp
+          curl -fsS localhost:8080/healthz
+          curl -fsS localhost:8080/api/status | tee /dev/stderr | grep -q '"setupRequired":true'
+          curl -fsS localhost:8080/api/status | grep -q '"version":"${{ steps.ver.outputs.v }}"'
+          curl -fsS -H 'accept: text/html' localhost:8080/projects | grep -q '<div id="root">'
+          test "$(curl -s -o /dev/null -w '%{http_code}' localhost:8080/api/projects)" = 401
+          curl -fsS -D - -o /dev/null -H 'accept: text/html' localhost:8080/ | grep -qi "content-security-policy: default-src 'self'"
+          test "$(stat -c %u:%g "$data/fieldplan.db")" = "99:100"
+          uid=$(docker exec fp sh -c 'stat -c %u /proc/$(pgrep -x node)')
+          echo "server runs as uid $uid"; test "$uid" = 99
+          for i in $(seq 1 30); do s=$(docker inspect -f '{{.State.Health.Status}}' fp); [ "$s" = healthy ] && break; sleep 2; done
+          echo "health: $s"; test "$s" = healthy
+          docker rm -f fp
+
+      - uses: docker/login-action@v4
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - id: meta
+        uses: docker/metadata-action@v6
+        with:
+          images: ghcr.io/${{ github.repository }}
+          tags: |
+            type=raw,value=latest,enable={{is_default_branch}}
+            type=semver,pattern={{version}}
+            type=sha
+
+      # amd64 only: Unraid runs on x86-64. Reuses the layers built above.
+      - name: Push
+        uses: docker/build-push-action@v7
+        with:
+          context: .
+          platforms: linux/amd64
+          push: true
+          tags: ${{ steps.meta.outputs.tags }}
+          labels: ${{ steps.meta.outputs.labels }}
+          build-args: |
+            NODE_IMAGE=${{ env.NODE_IMAGE }}
+            FIELDPLAN_VERSION=${{ steps.ver.outputs.v }}
+          cache-from: type=gha

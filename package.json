@@ -1,0 +1,25 @@
+{
+  "name": "fieldplan-app",
+  "private": true,
+  "type": "module",
+  "workspaces": [
+    "packages/shared",
+    "apps/server",
+    "apps/web"
+  ],
+  "engines": {
+    "node": ">=22.12"
+  },
+  "scripts": {
+    "build": "npm run build -w @fieldplan/shared && npm run build -w @fieldplan/server && npm run build -w @fieldplan/web",
+    "typecheck": "npm run typecheck --workspaces --if-present",
+    "test": "vitest run",
+    "dev:server": "npm run dev -w @fieldplan/server",
+    "dev:web": "npm run dev -w @fieldplan/web"
+  },
+  "devDependencies": {
+    "@types/node": "^24.19.2",
+    "typescript": "^7.0.2",
+    "vitest": "^5.0.3"
+  }
+}
