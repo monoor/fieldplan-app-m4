@@ -1,4 +1,4 @@
-# docker compose up -d   → http://<host>:8096
+# docker compose up -d   → http://<host>:6300
 services:
   fieldplan:
     image: ghcr.io/monoor/fieldplan-app:latest
@@ -6,7 +6,7 @@ services:
     container_name: fieldplan-app
     restart: unless-stopped
     ports:
-      - "8096:8080"
+      - "6300:8080"
     volumes:
       - ./data:/data
     environment:

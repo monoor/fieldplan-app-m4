@@ -7,7 +7,7 @@ Site CAD for low-voltage, electrical, security and smart-home installs. TypeScri
 ## Install on Unraid
 1. Make the package public once: GitHub → your profile → Packages → `fieldplan-app` → Package settings → Change visibility → Public.
 2. Copy `unraid/fieldplan-app.xml` to `/boot/config/plugins/dockerMan/templates-user/` on the server, then Docker → Add Container → choose **fieldplan-app**.
-3. Defaults: port 8096 (v1 stays on 8095), data in `/mnt/user/appdata/fieldplan-app`. Open the Web UI and create the admin account.
+3. Defaults: port 6300 (v1 stays on 8095), data in `/mnt/user/appdata/fieldplan-app`. Open the Web UI and create the admin account.
 4. Updates: Docker tab → check for updates → Apply.
 
 Back up the data folder (`fieldplan.db`, `files/`, `auth-secret`).

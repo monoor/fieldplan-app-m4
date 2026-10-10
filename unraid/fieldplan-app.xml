@@ -20,7 +20,7 @@
   <DonateText/>
   <DonateLink/>
   <Requires/>
-  <Config Name="Web UI port" Target="8080" Default="8096" Mode="tcp" Description="Host port for the web interface (v1 uses 8095)" Type="Port" Display="always" Required="true" Mask="false">8096</Config>
+  <Config Name="Web UI port" Target="8080" Default="6300" Mode="tcp" Description="Host port for the web interface (v1 uses 8095, Jellyfin 8096)" Type="Port" Display="always" Required="true" Mask="false">6300</Config>
   <Config Name="Data" Target="/data" Default="/mnt/user/appdata/fieldplan-app" Mode="rw" Description="Database, uploaded files and the sign-in secret. Back this up." Type="Path" Display="always" Required="true" Mask="false">/mnt/user/appdata/fieldplan-app</Config>
   <Config Name="Anthropic API key" Target="ANTHROPIC_API_KEY" Default="" Mode="" Description="Optional. Lets Claude read product pages and datasheet PDFs during catalog import. Leave empty to turn this off." Type="Variable" Display="always" Required="false" Mask="true"/>
   <Config Name="Public URL" Target="PUBLIC_URL" Default="" Mode="" Description="Only when served through a reverse proxy, e.g. https://plans.example.com (no trailing slash). Leave empty for LAN use." Type="Variable" Display="always" Required="false" Mask="false"/>
