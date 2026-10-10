@@ -285,3 +285,23 @@ kbd { font: 10px var(--mono); color: var(--muted); }
 .modal.wide { width: min(1100px, 100%); }
 .btn.warn-btn { color: var(--warn); border-color: #574517; }
 .dori { width: 100%; font-size: 12px; } .dori td { padding: 1px 4px; } .dori tr.dim { opacity: .4; }
+
+/* ---- BOM & proposal ---- */
+.grid4c { display: grid; grid-template-columns: repeat(4, 1fr); gap: 8px; margin-bottom: 8px; }
+.table .sec td { background: var(--panel-2); font: 600 11px var(--mono); text-transform: uppercase; letter-spacing: .06em; color: var(--muted); }
+.table .tot td { font-weight: 600; } .table .grand td { font-size: 15px; border-top: 2px solid var(--line); }
+input.price { width: 90px; text-align: right; }
+.proposal { max-width: 900px; margin: 0 auto; padding: 16px; display: flex; flex-direction: column; gap: 16px; }
+.proposal .sheet { background: #fff; color: #1b2733; border-radius: 6px; padding: 40px 48px; box-shadow: 0 6px 24px #0006; }
+.proposal .cover { min-height: 420px; } .proposal h1 { font-size: 40px; margin: 6px 0; color: #0d2438; } .proposal h2 { color: #0d2438; margin-top: 0; }
+.proposal .eyebrow { text-transform: uppercase; letter-spacing: .14em; font-size: 12px; color: #1769aa; margin: 0; } .proposal .lead { font-size: 18px; } .proposal .muted { color: #5a6b7a; }
+.proposal .kpis { display: flex; gap: 32px; margin-top: 40px; } .proposal .kpis b { display: block; font-size: 28px; } .proposal .kpis span { color: #5a6b7a; font-size: 13px; }
+.proposal .plan-page img { width: 100%; height: auto; border: 1px solid #c4ccd4; }
+.ptable { width: 100%; border-collapse: collapse; margin: 10px 0; } .ptable td, .ptable th { padding: 8px 4px; border-bottom: 1px solid #dde3e8; text-align: left; } .ptable .num { text-align: right; font-variant-numeric: tabular-nums; }
+.ptable.total td { font-size: 20px; font-weight: 700; border-bottom: 2px solid #1b2733; }
+.proposal .sign { display: flex; gap: 40px; margin-top: 56px; } .proposal .sign div { flex: 1; border-top: 1px solid #1b2733; padding-top: 4px; font-size: 12px; color: #5a6b7a; }
+@media print {
+  body { background: #fff; } .topbar, .foot, .no-print, header, nav { display: none !important; }
+  .proposal { max-width: none; padding: 0; gap: 0; } .proposal .sheet { box-shadow: none; border-radius: 0; padding: 0; page-break-after: always; }
+  .proposal .sheet:last-child { page-break-after: auto; }
+}

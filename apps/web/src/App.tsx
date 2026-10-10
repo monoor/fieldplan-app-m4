@@ -5,6 +5,7 @@ import { Setup } from './pages/Setup';
 import { Login } from './pages/Login';
 import { Projects } from './pages/Projects';
 import { ProjectView } from './pages/ProjectView';
+import { Proposal } from './pages/Proposal';
 import { Catalog } from './pages/Catalog';
 import { Settings } from './pages/Settings';
 import { ShareView } from './pages/ShareView';
@@ -20,6 +21,7 @@ export function App() {
         <Route path="/p/:id/edit" element={<Editor />} />
         <Route index element={<Projects />} />
         <Route path="/p/:id" element={<ProjectView />} />
+        <Route path="/p/:id/proposal" element={<Proposal />} />
         <Route path="/catalog" element={<Catalog />} />
         <Route path="/settings/*" element={<Settings />} />
       </Route>

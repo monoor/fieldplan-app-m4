@@ -14,7 +14,7 @@ const itemPlacement = (i: CatalogItem): Placement => {
   if (s.sfpPorts) ports.push({ id: gid('s'), name: 'SFP', kind: 'sfp', count: s.sfpPorts });
   const base = defaultPorts(typeId);
   return { typeId, over: {
-    catKey: i.category === 'other' ? 'network' : i.category, label: i.vendor + ' ' + i.model,
+    catKey: i.category === 'other' ? 'network' : i.category, catalogId: i.id, label: i.vendor + ' ' + i.model,
     ...(s.hfovDeg ? { fov: s.hfovDeg } : {}), ...(s.irRangeFt ? { range: s.irRangeFt } : {}), ...(s.maxPowerW ? { watts: s.maxPowerW } : {}),
     ...(ports.length ? { ports } : base ? { ports: base } : {}), ...(s.poeBudgetW ? { poeBudget: s.poeBudgetW } : {}),
   } };
