@@ -5,7 +5,7 @@ import type { Specs } from '@fieldplan/shared';
 
 export interface PageFacts {
   title: string | null;
-  product: { name?: string; brand?: string; model?: string; description?: string; specs: Specs } | null;
+  product: { name?: string; brand?: string; model?: string; description?: string; specs: Specs; price?: { value: number; currency: string } } | null;
   images: string[];
   datasheets: string[];
   text: string;
@@ -19,6 +19,17 @@ const num = (v: unknown): number | undefined => { const m = /-?\d+(?:\.\d+)?/.ex
 function abs(href: string | undefined, base: string): string | null {
   if (!href) return null;
   try { const u = new URL(href, base); return u.protocol === 'http:' || u.protocol === 'https:' ? u.toString() : null; } catch { return null; }
+}
+
+/** Lowest current price in a JSON-LD offers block (Offer, AggregateOffer or a list of them). */
+export function offerPrice(offers: unknown): { value: number; currency: string } | undefined {
+  const list = ([] as unknown[]).concat(offers ?? []).filter(isObj), found: { value: number; currency: string }[] = [];
+  for (const o of list) {
+    const v = num(o.price ?? o.lowPrice), cur = typeof o.priceCurrency === 'string' ? o.priceCurrency.toUpperCase() : 'USD';
+    if (v !== undefined && v >= 0 && /^[A-Z]{3}$/.test(cur) && !/OutOfStock|Discontinued/i.test(String(o.availability ?? ''))) found.push({ value: v, currency: cur });
+    if (o.offers) { const n = offerPrice(o.offers); if (n) found.push(n); }
+  }
+  return found.sort((a, b) => a.value - b.value)[0];
 }
 
 function products(node: unknown, out: J[]) {
@@ -54,7 +65,7 @@ export function extractFromHtml(html: string, pageUrl: string): PageFacts {
   if (p) {
     const specs: Specs = {};
     if (Array.isArray(p.additionalProperty)) for (const ap of p.additionalProperty) if (isObj(ap) && typeof ap.name === 'string') specFromProperty(ap.name, ap.value, specs);
-    product = { name: str(p.name), brand: str(p.brand) ?? str(p.manufacturer), model: str(p.model) ?? str(p.mpn) ?? str(p.sku), description: str(p.description)?.slice(0, 2000), specs };
+    product = { name: str(p.name), brand: str(p.brand) ?? str(p.manufacturer), model: str(p.model) ?? str(p.mpn) ?? str(p.sku), description: str(p.description)?.slice(0, 2000), specs, price: offerPrice(p.offers) };
     for (const im of ([] as unknown[]).concat(p.image ?? [])) { const u = abs(typeof im === 'string' ? im : isObj(im) ? str(im.url) ?? str(im.contentUrl) : undefined, pageUrl); if (u) images.add(u); }
   }
   const og = (k: string) => $('meta[property="' + k + '"]').attr('content') ?? $('meta[name="' + k + '"]').attr('content');

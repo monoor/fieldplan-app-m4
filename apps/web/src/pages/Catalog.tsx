@@ -54,6 +54,13 @@ const priceSummary = (i: CatalogItem) => {
 const specSummary = (s: Specs) => [s.megapixels && s.megapixels + ' MP', s.hfovDeg && s.hfovDeg + '° H', s.ports && s.ports + ' ports', s.poeBudgetW && s.poeBudgetW + ' W PoE', s.maxPowerW && s.maxPowerW + ' W', s.rackUnits && s.rackUnits + 'U', s.ipRating].filter(Boolean).join(' · ');
 const upload = (file: File) => { const fd = new FormData(); fd.append('file', file); return api<Stored>('/api/files', { method: 'POST', body: fd }); };
 
+/** How old the newest price is; prices older than 30 days are flagged. */
+function priceAge(i: CatalogItem) {
+  const at = i.prices.map(p => Date.parse(p.updatedAt ?? '')).filter(Number.isFinite); if (!at.length) return null;
+  const days = Math.floor((Date.now() - Math.max(...at)) / 86400000);
+  return <div className={days > 30 ? 'warn' : 'muted'} style={{ fontSize: 10.5 }}>{days <= 0 ? 'updated today' : days + 'd old'}</div>;
+}
+
 export function Catalog() {
   const me = useMe().data, qc = useQueryClient();
   const [q, setQ] = useState(''), [cat, setCat] = useState<string>('');
@@ -63,6 +70,11 @@ export function Catalog() {
   const [url, setUrl] = useState(''), [useClaude, setUseClaude] = useState(true), [err, setErr] = useState('');
   const writer = can(me, 'catalog:write'), importer = can(me, 'import:run'), claude = status.data?.claude;
 
+  const [refreshed, setRefreshed] = useState<{ id: string; name: string; changes: string[]; error?: string }[] | null>(null);
+  const refreshAll = useMutation({
+    mutationFn: () => api<{ results: { id: string; name: string; changes: string[]; error?: string }[] }>('/api/catalog/refresh-all', { method: 'POST' }),
+    onSuccess: r => { setRefreshed(r.results); setErr(''); qc.invalidateQueries({ queryKey: ['catalog'] }); }, onError: e => setErr(e.message),
+  });
   const imp = useMutation({
     mutationFn: () => api<ImportDraft>('/api/import/page', { method: 'POST', json: { url: url.trim(), useClaude: !!claude?.enabled && useClaude } }),
     onSuccess: d => { setErr(''); setOpen({ form: toForm(d.item), draft: d }); qc.invalidateQueries({ queryKey: ['import-status'] }); },
@@ -77,8 +89,11 @@ export function Catalog() {
         <h1>Catalog</h1>
         <input className="search" placeholder="Search vendor, model, name" value={q} onChange={e => setQ(e.target.value)} />
         <select value={cat} onChange={e => setCat(e.target.value)}><option value="">All categories</option>{CATEGORIES.map(c => <option key={c} value={c}>{c}</option>)}</select>
+        {importer && writer && <button className="btn" disabled={refreshAll.isPending} title="Re-read every item's source page for current prices" onClick={() => refreshAll.mutate()}>{refreshAll.isPending ? 'Refreshing…' : 'Refresh prices'}</button>}
         {writer && <button className="btn primary" onClick={() => setOpen({ form: toForm({}) })}>New item</button>}
       </div>
+      {refreshed && <div className="card"><div className="row"><b className="grow">Price refresh: {refreshed.filter(r => r.changes.length && !r.error).length} updated, {refreshed.filter(r => r.error).length} failed, {refreshed.length} checked</b><button className="btn sm" onClick={() => setRefreshed(null)}>Dismiss</button></div>
+        <ul className="issues">{refreshed.filter(r => r.error || r.changes.some(c => !/^No price/.test(c))).map(r => <li key={r.id} className={r.error ? 'error' : 'info'}><span>{r.error ? '●' : '○'}</span><b style={{ minWidth: 160 }}>{r.name}</b><span className="grow">{r.error ?? r.changes.join(' · ')}</span></li>)}</ul></div>}
 
       {importer && writer && (
         <form className="card row wrap" onSubmit={e => { e.preventDefault(); if (url.trim()) imp.mutate(); }}>
@@ -104,7 +119,7 @@ export function Catalog() {
             <tr key={i.id} onClick={() => setOpen({ form: toForm(i) })}>
               <td className="thumb">{i.imageSha && <img src={fileUrl(i.imageSha)} alt="" loading="lazy" />}</td>
               <td>{i.vendor}</td><td className="mono">{i.model}</td><td>{i.name}</td><td><span className={'dot cat-' + i.category} />{i.category}</td>
-              <td className="small muted">{specSummary(i.specs)}</td><td className="mono small">{priceSummary(i)}</td>
+              <td className="small muted">{specSummary(i.specs)}</td><td className="mono small">{priceSummary(i)}{priceAge(i)}</td>
               <td>{i.datasheetSha && <a href={fileUrl(i.datasheetSha)} target="_blank" rel="noopener noreferrer" onClick={e => e.stopPropagation()}>PDF</a>}</td>
             </tr>
           ))}</tbody>
@@ -153,6 +168,7 @@ function ItemEditor({ initial, draft, readOnly, canImport, claudeOn, onClose, on
     onSaved();
   });
   const remove = () => { if (confirm('Delete ' + f.vendor + ' ' + f.model + ' from the catalog?')) void run('Deleting…', async () => { await api('/api/catalog/' + f.id, { method: 'DELETE' }); onSaved(); }); };
+  const refreshItem = () => run('Reading source page…', async () => { const r = await api<{ changes: string[] }>('/api/catalog/' + f.id + '/refresh', { method: 'POST' }); alert(r.changes.join('\n') || 'Nothing changed.'); onSaved(); });
   const today = () => new Date().toISOString().slice(0, 10);
   const setPrice = (i: number, patch: Partial<PriceRow>) => set('prices', f.prices.map((p, j) => (j === i ? { ...p, ...patch, updatedAt: today() } : p)));
 
@@ -253,6 +269,7 @@ function ItemEditor({ initial, draft, readOnly, canImport, claudeOn, onClose, on
         {err && <div className="bad">{err}</div>}
         {!readOnly && (
           <div className="drawer-foot">
+            {f.id && f.sourceUrl && canImport && <button className="btn" onClick={refreshItem} disabled={!!busy} title="Re-read the source page for current price and missing specs">Refresh from source</button>}
             {f.id && <button className="btn danger" onClick={remove} disabled={!!busy}>Delete</button>}
             <span className="spacer" />
             <button className="btn" onClick={onClose}>Cancel</button>

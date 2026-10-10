@@ -1,7 +1,8 @@
 // Export a sheet as SVG / PNG / PDF: print-style colours, title block and a legend of what's on the drawing.
 import { createElement } from 'react';
 import { renderToStaticMarkup } from 'react-dom/server';
-import { DEVICE_TYPES, surfaceMat, wallMat, type ProjectRecord } from '@fieldplan/shared';
+import { DEFAULT_BOM, DEVICE_TYPES, analyze, buildBom, surfaceMat, wallMat, wireFor, type ProjectRecord, type Rec } from '@fieldplan/shared';
+import { panelOf } from './PanelDialog';
 import { Scene, type SceneRec } from './Scene';
 import { bounds } from './bounds';
 import { CATEGORY_COLORS, type ConeOptions } from './coneStyle';
@@ -85,4 +86,43 @@ export async function exportSheet(records: (SceneRec | ProjectRecord)[], o: Expo
   const pdf = new jsPDF({ orientation: 'landscape', unit: 'in', format: [PAPERS[o.paper].w, PAPERS[o.paper].h] });
   pdf.addImage(canvas.toDataURL('image/jpeg', 0.92), 'JPEG', 0, 0, PAPERS[o.paper].w, PAPERS[o.paper].h);
   download(pdf.output('blob'), base + '.pdf');
+}
+
+export interface SheetInput { name: string; recs: SceneRec[] }
+type Table = { title: string; head: string[]; widths: number[]; rows: string[][] };
+
+/** Schedules appended to a sheet set: cable schedule, panel schedules and a quantity take-off. */
+function scheduleTables(all: SceneRec[], scale: number): Table[] {
+  const recs = all as unknown as Rec[], out: Table[] = [], r = analyze(recs, () => scale);
+  const panels = recs.filter(x => x.kind === 'device' && (x.data.typeId === 'panel' || x.data.typeId === 'subpanel'));
+  for (const pd of panels) { const p = panelOf({ id: pd.id, data: pd.data }); if (!p.bkrs.length) continue;
+    out.push({ title: `Panel ${pd.data.tag ?? ''} — ${p.bus} A bus, ${p.volt}`, head: ['Slot', 'Circuit', 'Amps', 'Poles', 'Type', 'Min wire (Cu / NM)'], widths: [40, 260, 50, 50, 60, 140], rows: [...p.bkrs].sort((a, b) => a.slot - b.slot).map(b => { const w = wireFor(b.amps); return [String(b.slot), b.desc, String(b.amps), b.poles + 'P', b.type, w ? w.w[0] + ' / ' + w.w[1] : '']; }) }); }
+  if (r.schedule.length) out.push({ title: 'Cable schedule', head: ['Tag', 'Type', 'From', 'To', 'Length (ft)'], widths: [60, 90, 180, 180, 80], rows: [...r.schedule].sort((a, b) => a.tag.localeCompare(b.tag, undefined, { numeric: true })).map(c => [c.tag, c.type, c.from + (c.fromPort ? ' · ' + c.fromPort : ''), c.to + (c.toPort ? ' · ' + c.toPort : ''), String(Math.round(c.lengthFt))]) });
+  const bom = buildBom(recs, () => scale, DEFAULT_BOM);
+  if (bom.lines.length) out.push({ title: 'Quantities', head: ['Section', 'Item', 'Qty', 'Unit'], widths: [80, 360, 60, 50], rows: bom.lines.map(l => [l.section, l.description + (l.detail ? ' (' + l.detail + ')' : ''), String(l.qty), l.unit]) });
+  return out;
+}
+
+/** One PDF with a page per sheet, then the schedules. */
+export async function exportSheetSet(sheets: SheetInput[], o: Omit<ExportOpts, 'fmt' | 'sheetName'> & { schedules: boolean }, fileUrl: (sha: string) => string) {
+  const paper = PAPERS[o.paper], { jsPDF } = await import('jspdf'), pdf = new jsPDF({ orientation: 'landscape', unit: 'in', format: [paper.w, paper.h] });
+  let first = true;
+  for (const sh of sheets) {
+    const { svg, w, h } = await buildSheetSvg(sh.recs, { ...o, fmt: 'pdf', sheetName: sh.name }, fileUrl), canvas = await rasterize(svg, w, h, 200 / 96);
+    if (!first) pdf.addPage([paper.w, paper.h], 'landscape'); first = false;
+    pdf.addImage(canvas.toDataURL('image/jpeg', 0.92), 'JPEG', 0, 0, paper.w, paper.h);
+  }
+  if (o.schedules) {
+    const all = sheets.flatMap(x => x.recs), tables = scheduleTables(all, o.scale), pw = paper.w, ph = paper.h, left = 0.6, top = 0.7, lh = 0.2;
+    for (const t of tables) {
+      let y = ph + 1, firstPage = true; const total = t.widths.reduce((a, b) => a + b, 0), k = Math.min(1, (pw - left * 2) / (total / 72));
+      const colX = t.widths.map((_, i) => left + (t.widths.slice(0, i).reduce((a, b) => a + b, 0) / 72) * k);
+      const head = () => { pdf.setFont('helvetica', 'bold'); pdf.setFontSize(9); t.head.forEach((h, i) => pdf.text(h, colX[i]!, y)); pdf.setDrawColor(120); pdf.line(left, y + 0.05, pw - left, y + 0.05); y += lh; pdf.setFont('helvetica', 'normal'); };
+      for (const row of t.rows) {
+        if (y > ph - 0.6) { pdf.addPage([pw, ph], 'landscape'); y = top; pdf.setFont('helvetica', 'bold'); pdf.setFontSize(14); pdf.text(o.projectName + ' — ' + t.title + (firstPage ? '' : ' (cont.)'), left, y); y += 0.35; firstPage = false; head(); }
+        pdf.setFontSize(9); row.forEach((c, i) => pdf.text(String(c).slice(0, Math.floor(t.widths[i]! / 4.6)), colX[i]!, y)); y += lh;
+      }
+    }
+  }
+  download(pdf.output('blob'), (o.projectName.replace(/[^\w\- ]+/g, '').trim() || 'plans') + ' - sheet set.pdf');
 }

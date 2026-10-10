@@ -7,6 +7,10 @@ import type { ImportDraft, Specs } from '@fieldplan/shared';
 import { HttpError, parse, requirePerm } from '../http.js';
 import { fetchSafe } from '../import/fetcher.js';
 import { extractFromHtml } from '../import/extract.js';
+import { applyRefresh } from '../import/refresh.js';
+import { schema, nowIso } from '../db/index.js';
+import { eq } from 'drizzle-orm';
+import type { CatalogItemInput } from '@fieldplan/shared';
 import { sniffMime } from '../files.js';
 import type { Ctx } from '../context.js';
 
@@ -18,7 +22,7 @@ const merge = (a: Specs, b: Specs | undefined): Specs => {
   return out;
 };
 
-export default async function importRoutes(app: FastifyInstance, { auth, audit, files, claude, settings }: Ctx) {
+export default async function importRoutes(app: FastifyInstance, { auth, audit, files, claude, settings, store: { db } }: Ctx) {
   const limit = { rateLimit: { max: 20, timeWindow: '1 minute' } };
   const domains = () => settings.effective().importAllowedDomains;
 
@@ -71,6 +75,29 @@ export default async function importRoutes(app: FastifyInstance, { auth, audit, 
     audit.log({ userId: req.user!.id, userEmail: req.user!.email, ip: req.ip, action: 'import.datasheet', detail: { sha256 } });
     const draft: ImportDraft = { sourceUrl: f.sourceUrl ?? '', item: { ...x.item, specs: x.item.specs ?? {}, datasheetSha: sha256 }, datasheets: [], images: x.imageUrl ? [x.imageUrl] : [], via: ['claude'], warnings: x.warnings };
     return draft;
+  });
+
+  /** Re-read the product pages of catalog items: updates the price for that site and fills empty specs. */
+  const refreshOne = async (id: string, userId: string) => {
+    const row = db.select().from(schema.catalogItems).where(eq(schema.catalogItems.id, id)).get(); if (!row) throw new HttpError(404, 'Catalog item not found');
+    const item = JSON.parse(row.data) as CatalogItemInput; if (!item.sourceUrl) throw new HttpError(400, 'This item has no source link to refresh from');
+    const page = await fetchSafe(item.sourceUrl, { maxBytes: 25 * 1024 * 1024, accept: 'text/html,application/xhtml+xml', allowedDomains: domains() });
+    if (!/html|xml/i.test(page.contentType)) throw new HttpError(415, 'The source link is no longer a web page');
+    const r = applyRefresh(item, extractFromHtml(page.body.toString('utf8'), page.url), page.url, nowIso());
+    db.update(schema.catalogItems).set({ data: JSON.stringify(r.item), updatedAt: nowIso() }).where(eq(schema.catalogItems.id, id)).run();
+    void userId; return r;
+  };
+  app.post('/api/catalog/:id/refresh', { preHandler: requirePerm(auth, 'import:run'), config: limit }, async req => {
+    const { id } = parse(z.object({ id: z.uuid() }), req.params), r = await refreshOne(id, req.user!.id);
+    audit.log({ userId: req.user!.id, userEmail: req.user!.email, ip: req.ip, action: 'catalog.refresh', detail: { id, changes: r.changes.length } });
+    return { changes: r.changes, prices: r.item.prices };
+  });
+  app.post('/api/catalog/refresh-all', { preHandler: requirePerm(auth, 'import:run'), config: { rateLimit: { max: 3, timeWindow: '10 minutes' } } }, async req => {
+    const rows = db.select().from(schema.catalogItems).all().filter(r => (JSON.parse(r.data) as CatalogItemInput).sourceUrl).slice(0, 60), results: { id: string; name: string; changes: string[]; error?: string }[] = [];
+    for (const row of rows) { const it = JSON.parse(row.data) as CatalogItemInput, name = it.vendor + ' ' + it.model;
+      try { results.push({ id: row.id, name, changes: (await refreshOne(row.id, req.user!.id)).changes }); } catch (e) { results.push({ id: row.id, name, changes: [], error: (e as Error).message }); } }
+    audit.log({ userId: req.user!.id, userEmail: req.user!.email, ip: req.ip, action: 'catalog.refresh-all', detail: { items: results.length, failed: results.filter(r => r.error).length } });
+    return { results };
   });
 
   app.post('/api/import/test', { preHandler: requirePerm(auth, 'settings:manage'), config: limit }, async () => claude.test());

@@ -95,7 +95,7 @@ function EditorShell({ id, snapshot }: { id: string; snapshot: Snapshot }) {
         <input ref={fileIn} type="file" accept="image/png,image/jpeg,image/webp,image/gif" hidden onChange={e => { const f = e.target.files?.[0]; e.target.value = ''; if (f) void addUnderlay(f); }} />
         <button className="btn sm" disabled={!store.canUndo} onClick={() => store.undo()} title="Undo (Ctrl+Z)">↶</button>
         <button className="btn sm" disabled={!store.canRedo} onClick={() => store.redo()} title="Redo (Ctrl+Shift+Z)">↷</button>
-        <ExportMenu recs={() => (current ? (store.ofSheet(current.id) as SceneRec[]) : [])} cones={cones} projectName={name} client={snapshot.project.client} sheetName={String(current?.data.name ?? 'Sheet')} scale={scale} />
+        <ExportMenu allSheets={() => sheets.map(sh => ({ name: String(sh.data.name), recs: store.ofSheet(sh.id) as SceneRec[] }))} recs={() => (current ? (store.ofSheet(current.id) as SceneRec[]) : [])} cones={cones} projectName={name} client={snapshot.project.client} sheetName={String(current?.data.name ?? 'Sheet')} scale={scale} />
         <button className={'btn sm' + (issues ? ' warn-btn' : '')} onClick={() => setChecksOpen(true)}>Checks{issues ? ' (' + issues + ')' : ''}</button>
         <span className="spacer" />
         {store.conflicts > 0 && <span className="warn-chip" title="Another device changed the same items; your version was kept">{store.conflicts} overwritten</span>}

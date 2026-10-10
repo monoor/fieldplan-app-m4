@@ -100,3 +100,26 @@ describe('Claude extraction (SDK mocked)', () => {
     await expect(claude.extract({ url: 'https://x.example/', text: 'a' })).rejects.toMatchObject({ status: 502, message: expect.stringMatching(/API key was rejected/) });
   });
 });
+
+import { applyRefresh } from '../src/import/refresh.js';
+import type { CatalogItemInput } from '@fieldplan/shared';
+describe('catalog refresh', () => {
+  const page = (price: string, extra = '') => `<script type="application/ld+json">{"@type":"Product","name":"X","offers":{"@type":"Offer","price":"${price}","priceCurrency":"USD"}${extra}}</script>`;
+  const base = (): CatalogItemInput => ({ vendor: 'V', model: 'M', name: '', category: 'camera', specs: { hfovDeg: 100 }, prices: [{ source: 'store.example.com', price: 100, currency: 'USD' }, { source: 'manual quote', price: 90, currency: 'USD' }] });
+  it('reads offers from JSON-LD (lowest of an aggregate)', () => {
+    expect(extractFromHtml(page('149.99'), 'https://store.example.com/p').product?.price).toEqual({ value: 149.99, currency: 'USD' });
+    const agg = `<script type="application/ld+json">{"@type":"Product","name":"X","offers":{"@type":"AggregateOffer","lowPrice":"80","priceCurrency":"EUR"}}</script>`;
+    expect(extractFromHtml(agg, 'https://x.example/p').product?.price).toEqual({ value: 80, currency: 'EUR' });
+  });
+  it('updates only that site\'s price and keeps manual quotes and existing specs', () => {
+    const facts = extractFromHtml(page('120', ',"additionalProperty":[{"name":"Field of View","value":"90°"},{"name":"IP rating","value":"IP67"}]'), 'https://www.store.example.com/p');
+    const r = applyRefresh(base(), facts, 'https://www.store.example.com/p', '2026-10-09T00:00:00Z');
+    expect(r.item.prices.find(p => p.source === 'store.example.com')).toMatchObject({ price: 120, updatedAt: '2026-10-09T00:00:00Z' });
+    expect(r.item.prices.find(p => p.source === 'manual quote')!.price).toBe(90);
+    expect(r.item.specs.hfovDeg).toBe(100); expect(r.item.specs.ipRating).toBe('IP67'); expect(r.changes.join(' ')).toMatch(/100 → 120/);
+  });
+  it('adds a price entry for a new site', () => {
+    const r = applyRefresh({ ...base(), prices: [] }, extractFromHtml(page('55'), 'https://shop.example.org/p'), 'https://shop.example.org/p', 'now');
+    expect(r.item.prices).toEqual([{ source: 'shop.example.org', price: 55, currency: 'USD', updatedAt: 'now' }]);
+  });
+});
