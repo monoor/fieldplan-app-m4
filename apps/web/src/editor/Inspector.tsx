@@ -1,6 +1,6 @@
 // Properties of the current selection. Devices get their coverage, power and an editable list of inputs/ports.
 import { useState } from 'react';
-import { DEVICE_CATEGORIES, DOOR_TYPES, SURFACE_MATS, WALL_MATS, WINDOW_TYPES, surfaceMat, wallMat, DEVICE_TYPES, PORT_KINDS, PORT_KIND_LABELS, defaultPorts, deviceType, poePortWatts, portCount, portSummary, newId, type PortGroup, type PortKind } from '@fieldplan/shared';
+import { DEFAULT_HPX, HPX_OPTIONS, doriTable, DEVICE_CATEGORIES, DOOR_TYPES, SURFACE_MATS, WALL_MATS, WINDOW_TYPES, surfaceMat, wallMat, DEVICE_TYPES, PORT_KINDS, PORT_KIND_LABELS, defaultPorts, deviceType, poePortWatts, portCount, portSummary, newId, type PortGroup, type PortKind } from '@fieldplan/shared';
 import { api, fileUrl } from '../api';
 import { coverageOf, formatFt } from './Scene';
 import { CABLE_TYPES, cableInfo, nextTag } from './tools';
@@ -80,6 +80,11 @@ function DeviceProps({ store, r, set, scale, onSelect, onOpenPanel }: { store: E
     {cov && <fieldset className="box"><legend>Coverage</legend>
       <L t={'Field of view ' + Math.round(cov.fov) + '°'}><input type="range" min={10} max={360} value={cov.fov} onChange={e => set({ fov: Number(e.target.value) })} /></L>
       <L t={'Range ' + Math.round(cov.range) + ' ft'}><input type="range" min={3} max={200} value={cov.range} onChange={e => set({ range: Number(e.target.value) })} /></L>
+      <div className="grid2c">
+        <L t="Resolution"><select value={d.hpx ?? DEFAULT_HPX} onChange={e => set({ hpx: Number(e.target.value) })}>{HPX_OPTIONS.map(([v, l]) => <option key={v} value={v}>{l}</option>)}</select></L>
+        <L t="Codec"><select value={d.codec ?? 'h265'} onChange={e => set({ codec: e.target.value })}><option value="h265">H.265</option><option value="h264">H.264</option></select></L>
+      </div>
+      <table className="dori"><tbody>{doriTable(Number(d.hpx) || DEFAULT_HPX, cov.fov).map(l => <tr key={l.key} className={l.ft > cov.range ? 'dim' : ''}><td><b>{l.key}</b> {l.label}</td><td className="num mono">{l.ft.toFixed(0)} ft</td></tr>)}</tbody></table>
       {(d.fov !== undefined || d.range !== undefined) && <button className="btn sm" onClick={() => set({ fov: undefined, range: undefined }, r.id + ':covreset')}>Reset to type default</button>}
     </fieldset>}
     {!cov && (t?.cat === 'camera' || d.catKey === 'camera') && <button className="btn sm" onClick={() => set({ fov: 90, range: 30 })}>Add coverage cone</button>}
@@ -87,6 +92,13 @@ function DeviceProps({ store, r, set, scale, onSelect, onOpenPanel }: { store: E
       <L t="Power draw (W)"><input type="number" min={0} step={0.5} value={d.watts ?? ''} onChange={e => set({ watts: num(e.target.value) })} /></L>
       <L t="Colour"><span className="row"><input type="color" value={d.color ?? '#5fb8ff'} onChange={e => set({ color: e.target.value })} />{d.color && <button className="btn sm" onClick={() => set({ color: undefined })}>Auto</button>}</span></L>
     </div>
+    {/nvr/.test(String(d.typeId)) && <fieldset className="box"><legend>Recording</legend>
+      <div className="grid2c">
+        <L t="Channels"><input type="number" min={1} max={256} value={d.channels ?? 8} onChange={e => set({ channels: num(e.target.value) })} /></L>
+        <L t="Storage (TB)"><input type="number" min={0} step={0.5} value={d.storageTB ?? ''} placeholder="not set" onChange={e => set({ storageTB: num(e.target.value) })} /></L>
+        <L t="Retention (days)"><input type="number" min={1} max={365} value={d.days ?? 30} onChange={e => set({ days: num(e.target.value) })} /></L>
+        <L t="Recorded (%)"><input type="number" min={5} max={100} value={d.recordPct ?? 100} onChange={e => set({ recordPct: num(e.target.value) })} /></L>
+      </div><p className="muted small">100% = continuous; use ~30–50% for motion recording. Required storage is in Checks.</p></fieldset>}
     {isPanelType(d.typeId) && (() => { const pn = panelOf(r); return <button className="btn primary" onClick={() => onOpenPanel(r.id)}>Open panel · {pn.bkrs.length} breakers · {pn.bus} A</button>; })()}
     <PoweredFrom store={store} r={r} set={set} />
     <PortsEditor typeId={d.typeId} ports={d.ports} poeBudget={d.poeBudget} onChange={(ports, extra) => set({ ports, ...extra }, r.id + ':ports')} generic={d.typeId === 'generic' || d.typeId === 'generic-sw'} />

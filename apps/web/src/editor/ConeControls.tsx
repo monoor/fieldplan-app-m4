@@ -26,6 +26,7 @@ export function ConeControls({ opts, set }: { opts: ConeOptions; set: (p: Partia
           <label>Cone strength {Math.round(opts.opacity * 100)}%<input type="range" min={5} max={70} value={Math.round(opts.opacity * 100)} onChange={e => set({ opacity: Number(e.target.value) / 100 })} /></label>
           <label className="inline"><input type="checkbox" checked={opts.clip} onChange={e => set({ clip: e.target.checked })} /> Stop at walls (windows are see-through)</label>
           <label className="inline"><input type="checkbox" checked={opts.solo} onChange={e => set({ solo: e.target.checked })} /> Only show the selected camera</label>
+          <label className="inline"><input type="checkbox" checked={opts.dori} onChange={e => set({ dori: e.target.checked })} /> DORI bands (Identify / Recognize / Observe)</label>
           <label className="inline"><input type="checkbox" checked={opts.labels} onChange={e => set({ labels: e.target.checked })} /> Angle / range labels</label>
           <button className="btn sm" onClick={() => setOpen(false)}>Close</button>
         </div>

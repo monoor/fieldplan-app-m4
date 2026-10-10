@@ -29,3 +29,14 @@ describe('analyze', () => {
   });
   it('ignores deleted records', () => { const k = cable('k', 'a', 'b', 500); k.deleted = true; expect(analyze([k], scale).schedule).toHaveLength(0); });
 });
+import { bitrateMbps, doriDistance, storageTB } from '../src/dori.js';
+describe('DORI and storage', () => {
+  it('4 MP, 90° camera identifies at ~ 2560/(2·tan45·76) ≈ 16.8 ft', () => { expect(doriDistance(2560, 90, 76)).toBeCloseTo(16.8, 1); });
+  it('wide lenses use angular width', () => { expect(doriDistance(3840, 180, 19)).toBeCloseTo(3840 / (Math.PI * 19), 3); });
+  it('H.265 saves 40 %, override wins', () => { expect(bitrateMbps(2560, 'h265')).toBeCloseTo(3.6); expect(bitrateMbps(2560, 'h264', 10)).toBe(10); });
+  it('8 Mbps for 30 days ≈ 2.6 TB; 50 % motion halves it', () => { expect(storageTB(8, 30)).toBeCloseTo(2.592, 3); expect(storageTB(8, 30, 0.5)).toBeCloseTo(1.296, 3); });
+  it('NVR storage warning', () => {
+    const recs: Rec[] = [dev('nvr', 'nvr', { storageTB: 1, days: 30 }), dev('c1', 'cam-dome', { hpx: 3840 }), cable('k', 'nvr', 'c1', 30)];
+    const r = analyze(recs, scale); expect(r.nvrs[0]!.mbps).toBe(12); expect(r.issues.some(i => /TB/.test(i.message))).toBe(true);
+  });
+});

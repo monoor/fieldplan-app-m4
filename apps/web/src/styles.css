@@ -284,3 +284,4 @@ kbd { font: 10px var(--mono); color: var(--muted); }
 .bar i { display: block; height: 100%; }
 .modal.wide { width: min(1100px, 100%); }
 .btn.warn-btn { color: var(--warn); border-color: #574517; }
+.dori { width: 100%; font-size: 12px; } .dori td { padding: 1px 4px; } .dori tr.dim { opacity: .4; }

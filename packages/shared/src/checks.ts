@@ -1,5 +1,6 @@
 // Low-voltage and cabling checks computed from a project's records: cable schedule, PoE budgets, NVR channels, voltage drop.
 import { deviceType } from './devicetypes.js';
+import { DEFAULT_HPX, bitrateMbps, storageTB } from './dori.js';
 import { poePortWatts, portCount } from './ports.js';
 import type { PortGroup } from './ports.js';
 
@@ -63,7 +64,10 @@ export function analyze(records: Rec[], scaleOf: (sheetId: string | null) => num
   const nvrs = devices.filter(d => d.data.typeId === 'nvr' || /nvr/.test(String(d.data.typeId))).map(n => {
     const seen = new Set<string>([n.id]), q = [n.id], cams = new Set<string>();
     while (q.length) { const cur = q.shift()!; for (const e of adj.get(cur) ?? []) { if (e.cable.data.category === 'electrical' || seen.has(e.other)) continue; seen.add(e.other); const o = dev.get(e.other)!; if (!o) continue; if (isCam(o)) cams.add(o.id); else q.push(e.other); } }
-    const channels = Number(n.data.channels) || 8, row = { id: n.id, tag: tagOf(n.id), channels, cameras: cams.size, names: [...cams].map(tagOf) };
+    const channels = Number(n.data.channels) || 8, days = Number(n.data.days) || 30, activity = (Number(n.data.recordPct) || 100) / 100, capacity = Number(n.data.storageTB) || 0;
+    const mbps = [...cams].reduce((t, id) => { const c = dev.get(id)!; return t + bitrateMbps(Number(c.data.hpx) || DEFAULT_HPX, c.data.codec, Number(c.data.bitrateMbps) || undefined); }, 0), needTB = storageTB(mbps, days, activity);
+    const row = { id: n.id, tag: tagOf(n.id), channels, cameras: cams.size, names: [...cams].map(tagOf), mbps, days, needTB, capacity };
+    if (capacity && needTB > capacity) issues.push({ severity: 'warn', where: row.tag, id: n.id, message: `${days} days of recording needs about ${needTB.toFixed(1)} TB but storage is ${capacity} TB (~${Math.floor((capacity / needTB) * days)} days).` });
     if (row.cameras > channels) issues.push({ severity: 'error', where: row.tag, id: n.id, message: `${row.cameras} cameras reach this NVR but it has ${channels} channels.` });
     return row;
   });

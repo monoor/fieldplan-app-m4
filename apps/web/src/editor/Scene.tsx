@@ -2,7 +2,7 @@
 // Every selectable element carries data-id / data-kind so the editor can hit-test through the DOM.
 // Fully self-styled (no CSS classes) so the same component renders the on-screen plan and the exported SVG/PNG/PDF.
 import { memo, useMemo } from 'react';
-import { FOV_DEFAULTS, SURFACE_MATS, buildObstacles, deviceType, polyPath, surfaceMat, visibilityPolygon, wallMat, type Pt, type RecordKind } from '@fieldplan/shared';
+import { DEFAULT_HPX, FOV_DEFAULTS, doriTable, SURFACE_MATS, buildObstacles, deviceType, polyPath, surfaceMat, visibilityPolygon, wallMat, type Pt, type RecordKind } from '@fieldplan/shared';
 import { CATEGORY_COLORS, coneColor, type ConeOptions } from './coneStyle';
 
 export interface SceneRec { id: string; kind: RecordKind; data: Record<string, any>; rev?: number } // eslint-disable-line @typescript-eslint/no-explicit-any
@@ -67,7 +67,7 @@ function SceneImpl({ recs, scale, fileUrl, cones, selected, hot, light = false, 
     const x = Number(d.data.x), y = Number(d.data.y); if (!Number.isFinite(x) || !Number.isFinite(y)) return [];
     const color = coneColor(cones, { typeId: d.data.typeId, catKey: d.data.catKey, color: d.data.color, fov: cov.fov }, camIndex.get(d.id) ?? 0);
     const rangePx = cov.range * scale, poly = visibilityPolygon({ x, y, rotationDeg: Number(d.data.rotation) || 0, fovDeg: cov.fov, rangePx }, cones.clip ? obstacles : []);
-    return [{ d, cov, color, x, y, rangePx, path: polyPath(poly) }];
+    return [{ d, cov, color, x, y, rangePx, path: polyPath(poly), rot: Number(d.data.rotation) || 0 }];
   }) : [];
 
   const usedMats = [...new Set(by('surface').map(s => s.data.matId as string))].map(id => surfaceMat(id));
@@ -95,6 +95,12 @@ function SceneImpl({ recs, scale, fileUrl, cones, selected, hot, light = false, 
       })}
 
       <g style={{ pointerEvents: 'none' }}>
+        {cones.dori && coneList.map(({ d, cov, color, x, y, path, rot }) => {
+          const rad = (rot * Math.PI) / 180, rings = doriTable(Number(d.data.hpx) || DEFAULT_HPX, cov.fov).filter(l => l.key !== 'D' && l.ft < cov.range);
+          return <g key={'dori' + d.id}><clipPath id={'fp-cc-' + d.id}><path d={path} /></clipPath>
+            <g clipPath={`url(#fp-cc-${d.id})`}>{rings.map(l => <circle key={l.key} cx={x} cy={y} r={l.ft * scale} fill="none" stroke={color} strokeOpacity={0.8} strokeDasharray="5 4" {...sw(1)} />)}</g>
+            {rings.map(l => <text key={'t' + l.key} x={x + Math.sin(rad) * l.ft * scale} y={y - Math.cos(rad) * l.ft * scale + 3} {...text(9, color, { fontWeight: 700 })}>{l.key} {Math.round(l.ft)}′</text>)}</g>;
+        })}
         {coneList.map(({ d, color, path }) => {
           const on = sel(d.id) || hot === d.id, dim = hot && hot !== d.id && !sel(d.id) ? 0.5 : 1;
           return <path key={d.id} d={path} fill={`url(#fp-cg-${d.id})`} fillOpacity={dim * (on ? 1 : 0.9)} stroke={color} strokeOpacity={(on ? 0.95 : 0.5) * dim} {...sw(on ? 1.8 : 1)} strokeLinejoin="round" />;
