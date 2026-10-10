@@ -7,7 +7,8 @@ import { useMe } from '../App';
 import { EditorStore, useStoreVersion } from '../editor/store';
 import { EditorCanvas, type Placement } from '../editor/EditorCanvas';
 import { Palette, type Picks } from '../editor/Palette';
-import { PanelDialog, panelOf } from '../editor/PanelDialog';
+import { ChecksView, useChecks } from '../components/ChecksView';
+import { PanelDialog } from '../editor/PanelDialog';
 import { ExportMenu } from '../editor/ExportMenu';
 import { Inspector, uploadUnderlay } from '../editor/Inspector';
 import { useConeOptions } from '../editor/ConeControls';
@@ -39,7 +40,7 @@ function EditorShell({ id, snapshot }: { id: string; snapshot: Snapshot }) {
   const changeTool = (t: Tool) => { const m = modeOf(t); if (m) setModeState(m); setTool(t); if (t !== 'select') setSel(new Set()); };
   const [sel, setSel] = useState<ReadonlySet<string>>(new Set());
   const [cones, setCones] = useConeOptions();
-  const [panelId, setPanelId] = useState<string | null>(null);
+  const [panelId, setPanelId] = useState<string | null>(null), [checksOpen, setChecksOpen] = useState(false);
   const [snapOn, setSnapOn] = useState(true), [msg, setMsg] = useState('');
   const fileIn = useRef<HTMLInputElement>(null);
 
@@ -72,6 +73,9 @@ function EditorShell({ id, snapshot }: { id: string; snapshot: Snapshot }) {
       setSel(new Set([uid])); setTool('select'); setMsg('Underlay added at 60 ft wide — set its real width in the panel on the right.');
     } catch (e) { setMsg((e as Error).message); }
   };
+  const allRecs = useMemo(() => store.all() as never[], [store, version]); // eslint-disable-line react-hooks/exhaustive-deps
+  const issues = useChecks(allRecs, scale).issues.filter(i => i.severity !== 'info').length;
+  const pick = (rid: string) => { const r = store.get(rid); if (r?.sheetId) setSheet(r.sheetId); setSel(new Set([rid])); setChecksOpen(false); };
   const ul = current ? store.ofSheet(current.id).find(r => r.kind === 'underlay') : undefined;
   const state = store.saveState, name = String(meta.name ?? 'Project');
   const leave = async () => { await store.flush(); nav('/p/' + id); };
@@ -92,11 +96,13 @@ function EditorShell({ id, snapshot }: { id: string; snapshot: Snapshot }) {
         <button className="btn sm" disabled={!store.canUndo} onClick={() => store.undo()} title="Undo (Ctrl+Z)">↶</button>
         <button className="btn sm" disabled={!store.canRedo} onClick={() => store.redo()} title="Redo (Ctrl+Shift+Z)">↷</button>
         <ExportMenu recs={() => (current ? (store.ofSheet(current.id) as SceneRec[]) : [])} cones={cones} projectName={name} client={snapshot.project.client} sheetName={String(current?.data.name ?? 'Sheet')} scale={scale} />
+        <button className={'btn sm' + (issues ? ' warn-btn' : '')} onClick={() => setChecksOpen(true)}>Checks{issues ? ' (' + issues + ')' : ''}</button>
         <span className="spacer" />
         {store.conflicts > 0 && <span className="warn-chip" title="Another device changed the same items; your version was kept">{store.conflicts} overwritten</span>}
         <span className={'save ' + state} title={store.lastError}>{state === 'saved' ? 'Saved' : state === 'saving' ? 'Saving…' : state === 'dirty' ? 'Unsaved…' : 'Not saved — ' + (store.lastError || 'offline') + ' (retrying)'}</span>
       </div>
       {msg && <div className="ok small" onClick={() => setMsg('')}>{msg}</div>}
+      {checksOpen && <div className="modal-back" onPointerDown={e => { if (e.target === e.currentTarget) setChecksOpen(false); }}><div className="modal wide"><div className="row"><h2 className="grow">Checks</h2><button className="btn" onClick={() => setChecksOpen(false)}>Done</button></div><ChecksView records={allRecs} scale={scale} projectName={name} onPick={pick} /></div></div>}
       {panelId && store.get(panelId) && <PanelDialog dev={store.get(panelId)!} devs={store.all().filter(r => r.kind === 'device')} onClose={() => setPanelId(null)} onChange={pn => store.edit(tx => tx.patch(panelId, { panel: pn }), 'panel:' + panelId)} />}
       <div className="editor-body">
         <Palette mode={mode} setMode={setMode} tool={tool} setTool={changeTool} placement={placement} setPlacement={setPlacement} picks={picks} setPick={setPick} />

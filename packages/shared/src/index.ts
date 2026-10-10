@@ -9,3 +9,4 @@ export * from './ports.js';
 export * from './devicetypes.js';
 export * from './materials.js';
 export * from './electrical.js';
+export * from './checks.js';

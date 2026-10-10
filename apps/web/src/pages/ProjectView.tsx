@@ -5,6 +5,8 @@ import type { ProjectRecord, ProjectSummary } from '@fieldplan/shared';
 import { api, can, fileUrl, fmtDate } from '../api';
 import { useMe } from '../App';
 import { PlanView } from '../components/PlanView';
+import { analyze } from '@fieldplan/shared';
+import { ChecksView } from '../components/ChecksView';
 import { PanelSchedule, panelsOf } from '../components/PanelSchedule';
 import { ExportMenu } from '../editor/ExportMenu';
 import { loadConeOptions } from '../editor/coneStyle';
@@ -20,7 +22,7 @@ export function sheetsOf(records: ProjectRecord[]) {
 export function ProjectView() {
   const { id = '' } = useParams(), me = useMe().data, qc = useQueryClient(), nav = useNavigate();
   const snap = useQuery({ queryKey: ['project', id], queryFn: () => api<Snapshot>('/api/projects/' + encodeURIComponent(id) + '/snapshot') });
-  const [sheet, setSheet] = useState<string | null>(null), [tab, setTab] = useState<'plan' | 'devices' | 'panels' | 'share'>('plan');
+  const [sheet, setSheet] = useState<string | null>(null), [tab, setTab] = useState<'plan' | 'devices' | 'panels' | 'checks' | 'share'>('plan');
   const [editing, setEditing] = useState(false), [form, setForm] = useState({ name: '', client: '' }), [err, setErr] = useState('');
 
   const save = useMutation({
@@ -38,6 +40,7 @@ export function ProjectView() {
   if (snap.isError) return <div className="page"><div className="bad">{snap.error.message}</div></div>;
   const { project, records } = snap.data!;
   const meta = records.find(r => r.kind === 'meta')?.data ?? {}, scale = Number(meta.scale) || 20;
+  const issueCount = analyze(records as never, () => scale).issues.filter(i => i.severity !== 'info').length;
   const sheets = sheetsOf(records), current = sheets.find(s => s.id === sheet) ?? sheets[0];
 
   return (
@@ -64,10 +67,11 @@ export function ProjectView() {
       <div className="tabs">
         <button className={tab === 'plan' ? 'on' : ''} onClick={() => setTab('plan')}>Plan</button>
         <button className={tab === 'devices' ? 'on' : ''} onClick={() => setTab('devices')}>Devices</button>
+        <button className={tab === 'checks' ? 'on' : ''} onClick={() => setTab('checks')}>Checks{issueCount > 0 ? ' (' + issueCount + ')' : ''}</button>
         {panelsOf(records).length > 0 && <button className={tab === 'panels' ? 'on' : ''} onClick={() => setTab('panels')}>Panels</button>}
         {can(me, 'share:manage') && <button className={tab === 'share' ? 'on' : ''} onClick={() => setTab('share')}>Client links</button>}
         <span className="spacer" />
-        {tab !== 'share' && tab !== 'panels' && sheets.length > 1 && (
+        {tab !== 'share' && tab !== 'panels' && tab !== 'checks' && sheets.length > 1 && (
           <select value={current?.id} onChange={e => setSheet(e.target.value)}>{sheets.map(s => <option key={s.id} value={s.id}>{s.name}</option>)}</select>
         )}
       </div>
@@ -76,6 +80,7 @@ export function ProjectView() {
         <PlanView records={records} sheetId={current.id} fileUrl={fileUrl} scale={scale} />
       </> : <p className="muted">This project has no sheets.</p>)}
       {tab === 'devices' && current && <DeviceTable records={records} sheetId={current.id} />}
+      {tab === 'checks' && <ChecksView records={records as never} scale={scale} projectName={project.name} />}
       {tab === 'panels' && <PanelSchedule records={records} projectName={project.name} />}
       {tab === 'share' && <Shares projectId={id} sheets={sheets} />}
     </div>

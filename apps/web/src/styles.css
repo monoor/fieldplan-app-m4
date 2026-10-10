@@ -276,3 +276,11 @@ kbd { font: 10px var(--mono); color: var(--muted); }
 .bk-note { margin: 2px 0 4px 58px; }
 .table.compact td { padding: 3px 8px; font-size: 12px; }
 @media (max-width: 860px) { .modal-body { grid-template-columns: 1fr; } .grid3c { grid-template-columns: 1fr 1fr; } }
+.issues { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 4px; }
+.issues li { display: flex; gap: 8px; align-items: center; font-size: 12.5px; padding: 4px 6px; border-radius: 5px; background: var(--panel-2); }
+.issues li.error > span:first-child { color: var(--danger); } .issues li.warn > span:first-child { color: var(--warn); } .issues li.info > span:first-child { color: var(--muted); }
+.issues b { font: 600 11.5px var(--mono); min-width: 54px; }
+.bar { display: inline-block; width: 90px; height: 7px; background: var(--panel-2); border-radius: 4px; overflow: hidden; vertical-align: middle; border: 1px solid var(--line); }
+.bar i { display: block; height: 100%; }
+.modal.wide { width: min(1100px, 100%); }
+.btn.warn-btn { color: var(--warn); border-color: #574517; }
