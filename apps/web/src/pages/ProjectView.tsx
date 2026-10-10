@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { useNavigate, useParams } from 'react-router';
+import { Link, useNavigate, useParams } from 'react-router';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import type { ProjectRecord, ProjectSummary } from '@fieldplan/shared';
 import { api, can, fileUrl, fmtDate } from '../api';
@@ -48,6 +48,7 @@ export function ProjectView() {
           </form>
         ) : (<>
           <div className="grow"><h1>{project.name}</h1><div className="muted small">{project.client ?? 'No client'} · {project.records} items · updated {fmtDate(project.updatedAt)}</div></div>
+          {can(me, 'project:write') && <Link className="btn primary" to={'/p/' + id + '/edit'}>Edit plan</Link>}
           {can(me, 'project:write') && <button className="btn" onClick={() => { setForm({ name: project.name, client: project.client ?? '' }); setEditing(true); }}>Rename</button>}
           <a className="btn" href={'/api/projects/' + encodeURIComponent(id) + '/export'} download>Export JSON</a>
           {can(me, 'project:delete') && <button className="btn danger" onClick={() => { if (confirm('Delete “' + project.name + '”? It disappears for everyone (the data stays in the database and can be recovered by an admin).')) remove.mutate(); }}>Delete</button>}
@@ -67,7 +68,6 @@ export function ProjectView() {
 
       {tab === 'plan' && (current ? <>
         <PlanView records={records} sheetId={current.id} fileUrl={fileUrl} scale={scale} />
-        <p className="muted small">Viewing only — the drawing editor is being rebuilt for this version. Keep editing in Fieldplan v1 and re-import, or wait for milestone M1.</p>
       </> : <p className="muted">This project has no sheets.</p>)}
       {tab === 'devices' && current && <DeviceTable records={records} sheetId={current.id} />}
       {tab === 'share' && <Shares projectId={id} sheets={sheets} />}

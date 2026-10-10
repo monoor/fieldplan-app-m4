@@ -4,3 +4,6 @@ export * from './catalog.js';
 export * from './legacy.js';
 export * from './ids.js';
 export * from './fov.js';
+export * from './visibility.js';
+export * from './ports.js';
+export * from './devicetypes.js';

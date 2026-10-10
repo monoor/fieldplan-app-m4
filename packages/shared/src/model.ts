@@ -2,6 +2,7 @@
 // a sheet, or the project meta. Records sync individually, so an offline tablet only exchanges what changed.
 // Entity shapes follow Fieldplan v1 so existing projects import as-is; unknown extra fields are kept.
 import { z } from 'zod';
+import { PortGroup } from './ports.js';
 
 export const RECORD_KINDS = ['meta', 'sheet', 'wall', 'opening', 'surface', 'device', 'cable', 'bundle', 'label', 'dim', 'underlay'] as const;
 export type RecordKind = (typeof RECORD_KINDS)[number];
@@ -34,6 +35,11 @@ export const SurfaceData = z.looseObject({ points: z.array(Point).min(3), matId:
 export const DeviceData = z.looseObject({
   catKey: z.string().min(1), typeId: z.string().min(1), x: finite, y: finite,
   rotation: finite.optional(), tag: z.string().max(40).optional(), label: z.string().max(200).optional(), notes: z.string().max(5000).optional(),
+  /** Camera / sensor coverage: field of view in degrees and range in feet (type defaults apply when missing). */
+  fov: finite.min(1).max(360).optional(), range: finite.min(1).max(1000).optional(),
+  /** Custom inputs / outputs. Generic devices and switches are edited here. */
+  ports: z.array(PortGroup).max(40).optional(),
+  watts: finite.min(0).optional(), poeBudget: finite.min(0).optional(), color: z.string().regex(/^#[0-9a-fA-F]{6}$/).optional(),
 });
 export const CableData = z.looseObject({
   points: z.array(Point).min(2), cableType: z.string().min(1), category: z.string().optional(),

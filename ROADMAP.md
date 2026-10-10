@@ -1,7 +1,7 @@
 # Roadmap
 
 - **M0 Foundation (done):** shared model, server, auth/roles/2FA, shares, audit, catalog + import, web shell, Docker/CI, Unraid template.
-- **M1 Editor core:** port v1 drawing (walls, openings, devices, cables, cameras with FOV, labels, dims, underlays) to React/SVG on the record model; undo/redo; save via push ops.
+- **M1 Editor core (done):** port v1 drawing (walls, openings, devices, cables, cameras with FOV, labels, dims, underlays) to React/SVG on the record model; undo/redo; save via push ops.
 - **M2 Electrical & panels:** circuits, load calc, panel/rack inside views, schedules.
 - **M3 Low voltage:** PoE budgets, switch ports, NVR channels, DORI, cable schedules.
 - **M4 Offline tablets:** PWA with local record store, outbox and sync (pull since seq, push with baseSeq, conflict review).

@@ -2,7 +2,7 @@
 
 Site CAD for low-voltage, electrical, security and smart-home installs. TypeScript rewrite of the single-file v1 app: a Fastify + SQLite server, a React web app, user accounts, client share links, an audit log, and a device catalog that can import products from vendor pages.
 
-**Status:** M0 — foundation. Projects (import from v1), read-only plan viewer, catalog + web import, shares, users/2FA, audit log all work. The drawing editor is milestone M1; keep using v1 for drawing until then. See [ROADMAP.md](ROADMAP.md).
+**Status:** M1 — the plan editor works: draw walls, doors, windows, areas, devices, cables, labels and measurements; coverage cones stop at walls; devices have editable inputs/ports; autosave with undo/redo. See [ROADMAP.md](ROADMAP.md).
 
 ## Install on Unraid
 1. Make the package public once: GitHub → your profile → Packages → `fieldplan-app` → Package settings → Change visibility → Public.

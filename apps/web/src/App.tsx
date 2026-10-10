@@ -8,6 +8,7 @@ import { ProjectView } from './pages/ProjectView';
 import { Catalog } from './pages/Catalog';
 import { Settings } from './pages/Settings';
 import { ShareView } from './pages/ShareView';
+import { Editor } from './pages/Editor';
 
 export function App() {
   return (
@@ -16,6 +17,7 @@ export function App() {
       <Route path="/setup" element={<Setup />} />
       <Route path="/login" element={<Login />} />
       <Route element={<Shell />}>
+        <Route path="/p/:id/edit" element={<Editor />} />
         <Route index element={<Projects />} />
         <Route path="/p/:id" element={<ProjectView />} />
         <Route path="/catalog" element={<Catalog />} />
