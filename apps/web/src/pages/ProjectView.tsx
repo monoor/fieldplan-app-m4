@@ -5,6 +5,9 @@ import type { ProjectRecord, ProjectSummary } from '@fieldplan/shared';
 import { api, can, fileUrl, fmtDate } from '../api';
 import { useMe } from '../App';
 import { PlanView } from '../components/PlanView';
+import { ExportMenu } from '../editor/ExportMenu';
+import { loadConeOptions } from '../editor/coneStyle';
+import type { SceneRec } from '../editor/Scene';
 
 interface Snapshot { project: ProjectSummary; seq: number; records: ProjectRecord[] }
 interface Share { id: string; label: string | null; sheetId: string | null; expiresAt: string; createdAt: string; revokedAt: string | null; lastUsedAt: string | null; uses: number }
@@ -50,7 +53,8 @@ export function ProjectView() {
           <div className="grow"><h1>{project.name}</h1><div className="muted small">{project.client ?? 'No client'} · {project.records} items · updated {fmtDate(project.updatedAt)}</div></div>
           {can(me, 'project:write') && <Link className="btn primary" to={'/p/' + id + '/edit'}>Edit plan</Link>}
           {can(me, 'project:write') && <button className="btn" onClick={() => { setForm({ name: project.name, client: project.client ?? '' }); setEditing(true); }}>Rename</button>}
-          <a className="btn" href={'/api/projects/' + encodeURIComponent(id) + '/export'} download>Export JSON</a>
+          {current && <ExportMenu className="btn" recs={() => records.filter(r => r.sheetId === current.id && !r.deleted) as unknown as SceneRec[]} cones={loadConeOptions()} projectName={project.name} client={project.client} sheetName={current.name} scale={scale} />}
+          <a className="btn" href={'/api/projects/' + encodeURIComponent(id) + '/export'} download>JSON</a>
           {can(me, 'project:delete') && <button className="btn danger" onClick={() => { if (confirm('Delete “' + project.name + '”? It disappears for everyone (the data stays in the database and can be recovered by an admin).')) remove.mutate(); }}>Delete</button>}
         </>)}
       </div>

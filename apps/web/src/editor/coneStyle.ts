@@ -1,8 +1,11 @@
 // How camera/sensor cones are coloured. "By style" gives each device style (bullet, dome, PTZ, fisheye …) its own colour,
 // "each camera" separates every cone, "by category" matches the device colours, "single" uses one colour.
 export type ColorBy = 'style' | 'camera' | 'category' | 'single';
-export interface ConeOptions { show: boolean; colorBy: ColorBy; opacity: number; clip: boolean; labels: boolean; solo: boolean }
-export const DEFAULT_CONES: ConeOptions = { show: true, colorBy: 'style', opacity: 0.22, clip: true, labels: true, solo: false };
+export interface ConeOptions {
+  show: boolean; colorBy: ColorBy; opacity: number; clip: boolean; labels: boolean; solo: boolean;
+  /** Layers */ surfaces: boolean; surfaceLabels: boolean; walls: boolean; cables: boolean; cableLabels: boolean; devices: boolean; tags: boolean;
+}
+export const DEFAULT_CONES: ConeOptions = { show: true, colorBy: 'style', opacity: 0.26, clip: true, labels: false, solo: false, surfaces: true, surfaceLabels: true, walls: true, cables: true, cableLabels: false, devices: true, tags: true };
 
 export const CATEGORY_COLORS: Record<string, string> = { mech: '#ff9f43', electrical: '#e8a33d', smart: '#7ee08a', network: '#4fd1c5', camera: '#c496ff', access: '#ff7a90', av: '#ffd166', building: '#d7e0e8', other: '#9aa7b4' };
 
@@ -43,7 +46,7 @@ export function coneColor(opts: ConeOptions, d: { typeId: string; catKey: string
   }
 }
 
-const KEY = 'fp.cones.v1';
+const KEY = 'fp.cones.v2';
 export function loadConeOptions(): ConeOptions {
   try { return { ...DEFAULT_CONES, ...(JSON.parse(localStorage.getItem(KEY) ?? '{}') as Partial<ConeOptions>) }; } catch { return DEFAULT_CONES; }
 }

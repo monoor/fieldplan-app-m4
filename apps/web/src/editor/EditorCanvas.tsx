@@ -1,6 +1,7 @@
 // The interactive plan: drawing tools, selection, dragging, snapping and the pan/zoom viewport.
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { fileUrl } from '../api';
+import { wallMat, surfaceMat } from '@fieldplan/shared';
 import { Scene, formatFt, coverageOf, type SceneRec } from './Scene';
 import { ConeControls } from './ConeControls';
 import type { ConeOptions } from './coneStyle';
@@ -13,7 +14,7 @@ import { useStoreVersion, type EditorStore, type Rec } from './store';
 export interface Placement { typeId: string; over?: Record<string, unknown> }
 interface Props {
   store: EditorStore; sheetId: string; scale: number; gridFt: number; tool: Tool; setTool: (t: Tool) => void; placement: Placement;
-  cableType: string; matId: string; sel: ReadonlySet<string>; setSel: (s: ReadonlySet<string>) => void; cones: ConeOptions; setCones: (p: Partial<ConeOptions>) => void; snapOn: boolean;
+  cableType: string; matId: string; wallMatId: string; doorType: string; windowType: string; sel: ReadonlySet<string>; setSel: (s: ReadonlySet<string>) => void; cones: ConeOptions; setCones: (p: Partial<ConeOptions>) => void; snapOn: boolean;
 }
 type Draft = { tool: Tool; points: P[] };
 type Gesture =
@@ -27,7 +28,7 @@ const DRAW_TOOLS = new Set<Tool>(['wall', 'surface', 'cable', 'bundle', 'dim']);
 const MIN_POINTS: Partial<Record<Tool, number>> = { wall: 2, surface: 3, cable: 2, bundle: 2, dim: 2 };
 
 export function EditorCanvas(props: Props) {
-  const { store, sheetId, scale, gridFt, tool, setTool, placement, cableType, matId, sel, setSel, cones, setCones, snapOn } = props;
+  const { store, sheetId, scale, gridFt, tool, setTool, placement, cableType, matId, wallMatId, doorType, windowType, sel, setSel, cones, setCones, snapOn } = props;
   const version = useStoreVersion(store);
   const box = useRef<HTMLDivElement>(null);
   const recs = useMemo(() => store.ofSheet(sheetId) as SceneRec[], [store, version, sheetId]); // eslint-disable-line react-hooks/exhaustive-deps
@@ -70,7 +71,7 @@ export function EditorCanvas(props: Props) {
     if (d.tool === 'dim') points = points.slice(0, 2);
     const id = newRecId('wall');
     store.edit(tx => {
-      if (d.tool === 'wall') tx.put({ id, kind: 'wall', sheetId, data: { points, thick: 4.5, mat: 'default' } });
+      if (d.tool === 'wall') tx.put({ id, kind: 'wall', sheetId, data: { points, thick: wallMat(wallMatId).thick, mat: wallMatId } });
       else if (d.tool === 'surface') tx.put({ id, kind: 'surface', sheetId, data: { points, matId } });
       else if (d.tool === 'bundle') tx.put({ id, kind: 'bundle', sheetId, data: { points } });
       else if (d.tool === 'dim') tx.put({ id, kind: 'dim', sheetId, data: { points } });
@@ -82,7 +83,7 @@ export function EditorCanvas(props: Props) {
       }
     });
     setSel(new Set([id]));
-  }, [draft, store, sheetId, matId, cableType, setSel]);
+  }, [draft, store, sheetId, matId, wallMatId, cableType, setSel]);
 
   const deleteSelection = useCallback(() => { if (!sel.size) return; store.edit(tx => { for (const id of sel) tx.del(id); }); setSel(new Set()); }, [sel, store, setSel]);
 
@@ -121,7 +122,7 @@ export function EditorCanvas(props: Props) {
       let best: { d: number; wall: SceneRec; seg: number; t: number } | null = null;
       for (const r of recs) { if (r.kind !== 'wall') continue; const n = nearOnLine(w, r.data.points); if (!n) continue; const lim = ((r.data.thick ?? 4.5) / 12) * scale / 2 + 10 / k; if (n.d <= lim && (!best || n.d < best.d)) best = { d: n.d, wall: r, seg: n.seg, t: n.t }; }
       if (!best) return; const id = newRecId('opening'), b = best;
-      store.edit(tx => tx.put({ id, kind: 'opening', sheetId, data: { kind: tool, wallId: b.wall.id, segIndex: b.seg, t: Math.max(0.02, Math.min(0.98, b.t)), width: tool === 'door' ? 3 : 4 } }));
+      store.edit(tx => tx.put({ id, kind: 'opening', sheetId, data: { kind: tool, wallId: b.wall.id, segIndex: b.seg, t: Math.max(0.02, Math.min(0.98, b.t)), width: tool === 'door' ? (doorType === 'double' || doorType === 'overhead' ? 6 : 3) : 4, ...(tool === 'door' ? { doorType, hinge: 'left', swingSide: 'in' } : { winType: windowType }) } }));
       setSel(new Set([id])); return;
     }
     if (tool === 'device') {
@@ -240,7 +241,7 @@ export function EditorCanvas(props: Props) {
             {handlesFor.map((p, i) => <circle key={i} data-handle={i} cx={p.x} cy={p.y} r={6 / k} className="vtx" />)}
           </g>}
           {draft && <g pointerEvents="none">
-            <polyline points={ptsAttr(rubber)} fill={draft.tool === 'surface' ? '#3f9a4a33' : 'none'} stroke={draft.tool === 'wall' ? '#d7e0e8' : '#5fb8ff'} strokeWidth={draft.tool === 'wall' ? Math.max(2, (4.5 / 12) * scale) : 2} strokeDasharray={draft.tool === 'wall' ? undefined : '6 4'} opacity={0.75} vectorEffect={draft.tool === 'wall' ? undefined : 'non-scaling-stroke'} />
+            <polyline points={ptsAttr(rubber)} fill={draft.tool === 'surface' ? surfaceMat(matId).color + '66' : 'none'} stroke={draft.tool === 'wall' ? wallMat(wallMatId).color : '#5fb8ff'} strokeWidth={draft.tool === 'wall' ? Math.max(3, (wallMat(wallMatId).thick / 12) * scale) : 2} strokeDasharray={draft.tool === 'wall' ? undefined : '6 4'} opacity={0.75} vectorEffect={draft.tool === 'wall' ? undefined : 'non-scaling-stroke'} />
             {draft.points.map((p, i) => <circle key={i} cx={p.x} cy={p.y} r={4 / k} fill="#5fb8ff" />)}
             {last && cursor && <text x={(last.x + cursor.x) / 2} y={(last.y + cursor.y) / 2 - 8 / k} className="plan-label dim" style={{ fontSize: 12 / k }}>{formatFt(dist(last, cursor) / scale)}</text>}
           </g>}

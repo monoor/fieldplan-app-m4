@@ -7,3 +7,4 @@ export * from './fov.js';
 export * from './visibility.js';
 export * from './ports.js';
 export * from './devicetypes.js';
+export * from './materials.js';

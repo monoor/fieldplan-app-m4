@@ -6,10 +6,12 @@ import { api, can } from '../api';
 import { useMe } from '../App';
 import { EditorStore, useStoreVersion } from '../editor/store';
 import { EditorCanvas, type Placement } from '../editor/EditorCanvas';
-import { Palette } from '../editor/Palette';
+import { Palette, type Picks } from '../editor/Palette';
+import { ExportMenu } from '../editor/ExportMenu';
 import { Inspector, uploadUnderlay } from '../editor/Inspector';
 import { useConeOptions } from '../editor/ConeControls';
-import type { Tool } from '../editor/tools';
+import { modeOf, type Mode, type Tool } from '../editor/tools';
+import type { SceneRec } from '../editor/Scene';
 
 interface Snapshot { project: ProjectSummary; seq: number; records: ProjectRecord[] }
 
@@ -29,7 +31,11 @@ function EditorShell({ id, snapshot }: { id: string; snapshot: Snapshot }) {
   const [sheetId, setSheet] = useState<string | null>(null);
   const [tool, setTool] = useState<Tool>('select');
   const [placement, setPlacement] = useState<Placement>({ typeId: 'cam-dome' });
-  const [cableType, setCableType] = useState('cat6'), [matId, setMatId] = useState('floor');
+  const [mode, setModeState] = useState<Mode>('build');
+  const [picks, setPicks] = useState<Picks>({ wall: 'stud', door: 'single', window: 'fixed', surface: 'tile', cable: 'cat6' });
+  const setPick = (k: keyof Picks, v: string) => setPicks(p => ({ ...p, [k]: v }));
+  const setMode = (m: Mode) => { setModeState(m); setTool(m === 'build' ? 'wall' : 'device'); setSel(new Set()); };
+  const changeTool = (t: Tool) => { const m = modeOf(t); if (m) setModeState(m); setTool(t); if (t !== 'select') setSel(new Set()); };
   const [sel, setSel] = useState<ReadonlySet<string>>(new Set());
   const [cones, setCones] = useConeOptions();
   const [snapOn, setSnapOn] = useState(true), [msg, setMsg] = useState('');
@@ -74,24 +80,27 @@ function EditorShell({ id, snapshot }: { id: string; snapshot: Snapshot }) {
         <button className="btn sm" onClick={() => void leave()}>← Done</button>
         <strong className="ename">{name}</strong>
         <select value={current?.id ?? ''} onChange={e => { setSheet(e.target.value); setSel(new Set()); }} aria-label="Sheet">{sheets.map(s => <option key={s.id} value={s.id}>{s.data.name}</option>)}</select>
-        <button className="btn sm" onClick={addSheet} title="Add a sheet (floor)">+ Sheet</button>
-        <button className="btn sm" onClick={renameSheet}>Rename</button>
-        {sheets.length > 1 && <button className="btn sm" onClick={deleteSheet}>Delete sheet</button>}
-        <span className="sep" />
-        <button className="btn sm" disabled={!store.canUndo} onClick={() => store.undo()} title="Undo (Ctrl+Z)">↶ Undo</button>
-        <button className="btn sm" disabled={!store.canRedo} onClick={() => store.redo()} title="Redo (Ctrl+Shift+Z)">↷ Redo</button>
-        <label className="inline small"><input type="checkbox" checked={snapOn} onChange={e => setSnapOn(e.target.checked)} /> Snap {gridFt}′</label>
-        <button className="btn sm" onClick={() => (ul ? setSel(new Set([ul.id])) : fileIn.current?.click())}>{ul ? 'Underlay' : '+ Underlay'}</button>
+        <details className="menu"><summary className="btn sm">Sheet ▾</summary><div className="popover left">
+          <button className="btn sm" onClick={addSheet}>Add sheet</button><button className="btn sm" onClick={renameSheet}>Rename</button>
+          {sheets.length > 1 && <button className="btn sm danger" onClick={deleteSheet}>Delete sheet</button>}
+          <button className="btn sm" onClick={() => (ul ? setSel(new Set([ul.id])) : fileIn.current?.click())}>{ul ? 'Edit underlay' : 'Add underlay image'}</button>
+          <label className="inline small"><input type="checkbox" checked={snapOn} onChange={e => setSnapOn(e.target.checked)} /> Snap to {gridFt}′ grid</label>
+        </div></details>
         <input ref={fileIn} type="file" accept="image/png,image/jpeg,image/webp,image/gif" hidden onChange={e => { const f = e.target.files?.[0]; e.target.value = ''; if (f) void addUnderlay(f); }} />
+        <button className="btn sm" disabled={!store.canUndo} onClick={() => store.undo()} title="Undo (Ctrl+Z)">↶</button>
+        <button className="btn sm" disabled={!store.canRedo} onClick={() => store.redo()} title="Redo (Ctrl+Shift+Z)">↷</button>
+        <ExportMenu recs={() => (current ? (store.ofSheet(current.id) as SceneRec[]) : [])} cones={cones} projectName={name} client={snapshot.project.client} sheetName={String(current?.data.name ?? 'Sheet')} scale={scale} />
         <span className="spacer" />
         {store.conflicts > 0 && <span className="warn-chip" title="Another device changed the same items; your version was kept">{store.conflicts} overwritten</span>}
         <span className={'save ' + state} title={store.lastError}>{state === 'saved' ? 'Saved' : state === 'saving' ? 'Saving…' : state === 'dirty' ? 'Unsaved…' : 'Not saved — ' + (store.lastError || 'offline') + ' (retrying)'}</span>
       </div>
       {msg && <div className="ok small" onClick={() => setMsg('')}>{msg}</div>}
       <div className="editor-body">
-        <Palette tool={tool} setTool={t => { setTool(t); if (t !== 'select') setSel(new Set()); }} placement={placement} setPlacement={setPlacement} cableType={cableType} setCableType={setCableType} matId={matId} setMatId={setMatId} />
-        {current ? <EditorCanvas store={store} sheetId={current.id} scale={scale} gridFt={gridFt} tool={tool} setTool={setTool} placement={placement} cableType={cableType} matId={matId} sel={sel} setSel={setSel} cones={cones} setCones={setCones} snapOn={snapOn} /> : <div className="plan" />}
-        <Inspector store={store} sel={sel} scale={scale} onSelect={ids => setSel(new Set(ids))} />
+        <Palette mode={mode} setMode={setMode} tool={tool} setTool={changeTool} placement={placement} setPlacement={setPlacement} picks={picks} setPick={setPick} />
+        <div className="canvas-wrap">
+          {current ? <EditorCanvas store={store} sheetId={current.id} scale={scale} gridFt={gridFt} tool={tool} setTool={changeTool} placement={placement} cableType={picks.cable} matId={picks.surface} wallMatId={picks.wall} doorType={picks.door} windowType={picks.window} sel={sel} setSel={setSel} cones={cones} setCones={setCones} snapOn={snapOn} /> : <div className="plan" />}
+          {sel.size > 0 && <aside className="inspector float"><Inspector store={store} sel={sel} scale={scale} onSelect={ids => setSel(new Set(ids))} /></aside>}
+        </div>
       </div>
     </div>
   );

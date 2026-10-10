@@ -233,3 +233,31 @@ kbd { font: 10px var(--mono); color: var(--muted); }
   .palette { max-height: 30vh; flex-direction: row; flex-wrap: wrap; }
   .tools { grid-template-columns: repeat(5, 1fr); }
 }
+
+/* ---- Editor v2 layout: compact bar, mode switch, option lists, floating inspector ---- */
+.editor-body { grid-template-columns: 236px minmax(0, 1fr); }
+.canvas-wrap { position: relative; min-width: 0; min-height: 0; display: flex; }
+.canvas-wrap > .plan { flex: 1; height: auto; min-height: 0; border-radius: 0; border-width: 0 0 0 1px; }
+.inspector.float { position: absolute; top: 46px; right: 8px; bottom: 30px; width: 288px; border: 1px solid var(--line); border-radius: 10px; box-shadow: 0 10px 32px #000a; z-index: 1; }
+.palette { gap: 10px; }
+.seg.mode button { padding: 7px 4px; font-weight: 600; }
+.tools { grid-template-columns: repeat(3, 1fr); }
+.tool { justify-content: center; padding: 7px 4px; }
+.opts { display: flex; flex-direction: column; gap: 4px; overflow-y: auto; min-height: 0; flex: 1; }
+.opts h4 { margin: 8px 0 2px; font-size: 10.5px; text-transform: uppercase; letter-spacing: .06em; color: var(--muted); }
+.opt-list { display: flex; flex-direction: column; gap: 2px; }
+.opt { display: flex; align-items: center; gap: 8px; padding: 5px 8px; background: transparent; border: 1px solid transparent; border-radius: 5px; color: var(--text); cursor: pointer; font: 12.5px var(--sans); text-align: left; }
+.opt:hover { background: var(--panel-2); }
+.opt.on { border-color: var(--accent); background: #12283b; }
+.opt small { margin-left: auto; color: var(--muted); font: 10.5px var(--mono); }
+.sw { display: inline-block; width: 14px; height: 14px; border-radius: 3px; border: 2px solid; flex: none; }
+.menu { position: relative; }
+.menu summary { list-style: none; cursor: pointer; }
+.menu summary::-webkit-details-marker { display: none; }
+.popover.left { right: auto; left: 0; }
+.popover .layers { display: grid; grid-template-columns: 1fr 1fr; gap: 4px 8px; }
+.menu .popover { display: flex; }
+.cone-ctl .popover.left { top: 32px; }
+@media (max-width: 1000px) { .inspector.float { left: 8px; width: auto; top: auto; bottom: 30px; max-height: 45%; } .tools { grid-template-columns: repeat(3, 1fr); } .editor-body { grid-template-columns: 200px minmax(0, 1fr); } }
+@media (max-width: 640px) { .editor-body { grid-template-columns: minmax(0, 1fr); grid-template-rows: auto minmax(0, 1fr); } .palette { max-height: 34vh; flex-direction: column; } }
+.plan-tools { z-index: 6; }

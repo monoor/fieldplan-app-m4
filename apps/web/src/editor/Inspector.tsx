@@ -1,9 +1,9 @@
 // Properties of the current selection. Devices get their coverage, power and an editable list of inputs/ports.
 import { useState } from 'react';
-import { DEVICE_CATEGORIES, DEVICE_TYPES, PORT_KINDS, PORT_KIND_LABELS, defaultPorts, deviceType, poePortWatts, portCount, portSummary, newId, type PortGroup, type PortKind } from '@fieldplan/shared';
+import { DEVICE_CATEGORIES, DOOR_TYPES, SURFACE_MATS, WALL_MATS, WINDOW_TYPES, surfaceMat, wallMat, DEVICE_TYPES, PORT_KINDS, PORT_KIND_LABELS, defaultPorts, deviceType, poePortWatts, portCount, portSummary, newId, type PortGroup, type PortKind } from '@fieldplan/shared';
 import { api, fileUrl } from '../api';
 import { coverageOf, formatFt } from './Scene';
-import { CABLE_TYPES, MATERIALS, cableInfo, nextTag } from './tools';
+import { CABLE_TYPES, cableInfo, nextTag } from './tools';
 import { dist, type P } from './geometry';
 import { styleName } from './coneStyle';
 import type { EditorStore, Rec } from './store';
@@ -14,7 +14,7 @@ const num = (v: string) => (v.trim() === '' ? undefined : Number(v));
 
 export function Inspector({ store, sel, scale, onSelect }: { store: EditorStore; sel: ReadonlySet<string>; scale: number; onSelect: (ids: string[]) => void }) {
   const recs = [...sel].map(id => store.get(id)).filter((r): r is Rec => !!r);
-  if (!recs.length) return <div className="inspector muted small"><p>Nothing selected.</p><p>Pick a tool on the left, or click something on the plan. Drag empty space to pan, scroll or pinch to zoom.</p></div>;
+  if (!recs.length) return null;
   if (recs.length > 1) return (
     <div className="inspector"><h3>{recs.length} items selected</h3>
       <button className="btn danger" onClick={() => { store.edit(tx => recs.forEach(r => tx.del(r.id))); onSelect([]); }}>Delete {recs.length} items</button></div>
@@ -28,15 +28,21 @@ export function Inspector({ store, sel, scale, onSelect }: { store: EditorStore;
       <div className="row"><h3 className="grow">{title}</h3><button className="btn sm danger" onClick={remove}>Delete</button></div>
       {r.kind === 'device' && <DeviceProps store={store} r={r} set={set} scale={scale} onSelect={onSelect} />}
       {r.kind === 'wall' && <>
+        <L t="Wall style"><select value={wallMat(r.data.mat).id} onChange={e => set({ mat: e.target.value, thick: wallMat(e.target.value).thick })}>{WALL_MATS.map(m => <option key={m.id} value={m.id}>{m.label}</option>)}</select></L>
         <L t="Thickness (in)"><input type="number" min={1} max={60} step={0.5} value={r.data.thick ?? 4.5} onChange={e => set({ thick: num(e.target.value) ?? 4.5 })} /></L>
         <L t="Label"><input value={r.data.label ?? ''} maxLength={100} onChange={e => set({ label: e.target.value || undefined })} /></L>
         <p className="muted small">Length {formatFt(pathLen(r.data.points) / scale)}</p></>}
       {r.kind === 'opening' && <>
         <L t="Type"><select value={r.data.kind} onChange={e => set({ kind: e.target.value })}><option value="door">Door (blocks cameras)</option><option value="window">Window (cameras see through)</option></select></L>
+        {r.data.kind === 'door' ? <>
+          <L t="Door style"><select value={r.data.doorType ?? 'single'} onChange={e => set({ doorType: e.target.value })}>{DOOR_TYPES.map(([v, l]) => <option key={v} value={v}>{l}</option>)}</select></L>
+          <div className="grid2c"><L t="Hinge"><select value={r.data.hinge ?? 'left'} onChange={e => set({ hinge: e.target.value })}><option value="left">Left</option><option value="right">Right</option></select></L>
+            <L t="Swings"><select value={r.data.swingSide ?? 'in'} onChange={e => set({ swingSide: e.target.value })}><option value="in">One side</option><option value="out">Other side</option></select></L></div></>
+          : <L t="Window style"><select value={r.data.winType ?? 'fixed'} onChange={e => set({ winType: e.target.value })}>{WINDOW_TYPES.map(([v, l]) => <option key={v} value={v}>{l}</option>)}</select></L>}
         <L t="Width (ft)"><input type="number" min={1} max={30} step={0.25} value={r.data.width} onChange={e => set({ width: num(e.target.value) ?? 3 })} /></L>
         <L t={'Position ' + Math.round(r.data.t * 100) + '%'}><input type="range" min={2} max={98} value={Math.round(r.data.t * 100)} onChange={e => set({ t: Number(e.target.value) / 100 })} /></L></>}
       {r.kind === 'surface' && <>
-        <L t="Surface"><select value={r.data.matId} onChange={e => set({ matId: e.target.value })}>{MATERIALS.map(m => <option key={m.id} value={m.id}>{m.label}</option>)}{!MATERIALS.some(m => m.id === r.data.matId) && <option value={r.data.matId}>{r.data.matId}</option>}</select></L>
+        <L t="Floor / area"><select value={surfaceMat(r.data.matId).id} onChange={e => set({ matId: e.target.value })}>{[...new Set(SURFACE_MATS.map(m => m.group))].map(g => <optgroup key={g} label={g}>{SURFACE_MATS.filter(m => m.group === g && !m.hidden).map(m => <option key={m.id} value={m.id}>{m.label}</option>)}</optgroup>)}{surfaceMat(r.data.matId).hidden && <option value="floor">Floor</option>}</select></L>
         <L t="Label"><input value={r.data.label ?? ''} maxLength={100} onChange={e => set({ label: e.target.value || undefined })} /></L></>}
       {r.kind === 'label' && <L t="Text"><textarea rows={3} maxLength={2000} value={r.data.text} onChange={e => set({ text: e.target.value })} /></L>}
       {r.kind === 'dim' && <p className="mono">{formatFt(dist(r.data.points[0], r.data.points[1]) / scale)}</p>}

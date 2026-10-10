@@ -3,18 +3,20 @@ import type { EditorStore, Rec } from './store';
 import { nearOnLine, type P } from './geometry';
 
 export type Tool = 'select' | 'wall' | 'door' | 'window' | 'surface' | 'device' | 'cable' | 'bundle' | 'label' | 'dim';
-export const TOOLS: { id: Tool; label: string; key: string; hint: string }[] = [
-  { id: 'select', label: 'Select', key: 'V', hint: 'Click to select · drag to move · drag empty space to pan' },
-  { id: 'wall', label: 'Wall', key: 'W', hint: 'Click points · double-click or Enter to finish · Shift = straight lines' },
-  { id: 'door', label: 'Door', key: 'D', hint: 'Click a wall to place a door' },
-  { id: 'window', label: 'Window', key: 'N', hint: 'Click a wall to place a window (cameras see through windows)' },
-  { id: 'surface', label: 'Area', key: 'A', hint: 'Click corners · double-click or Enter to close' },
-  { id: 'device', label: 'Device', key: 'P', hint: 'Pick a device on the left, then click to place · cameras snap to walls' },
-  { id: 'cable', label: 'Cable', key: 'C', hint: 'Click points · end on a device to connect it · double-click or Enter to finish' },
-  { id: 'bundle', label: 'Bundle', key: 'B', hint: 'Click points for a cable bundle / conduit run' },
-  { id: 'label', label: 'Label', key: 'T', hint: 'Click to place text' },
-  { id: 'dim', label: 'Measure', key: 'M', hint: 'Click two points' },
+export type Mode = 'build' | 'systems';
+export const TOOLS: { id: Tool; label: string; key: string; hint: string; modes: Mode[] }[] = [
+  { id: 'select', label: 'Select', key: 'V', hint: 'Click to select · drag to move · drag empty space to pan', modes: ['build', 'systems'] },
+  { id: 'wall', label: 'Wall', key: 'W', hint: 'Click points · double-click or Enter to finish · Shift = straight lines', modes: ['build'] },
+  { id: 'door', label: 'Door', key: 'D', hint: 'Click a wall to place a door', modes: ['build'] },
+  { id: 'window', label: 'Window', key: 'N', hint: 'Click a wall to place a window (cameras see through windows)', modes: ['build'] },
+  { id: 'surface', label: 'Floor', key: 'A', hint: 'Click corners · double-click or Enter to close', modes: ['build'] },
+  { id: 'device', label: 'Device', key: 'P', hint: 'Pick a device on the left, then click to place · cameras snap to walls', modes: ['systems'] },
+  { id: 'cable', label: 'Cable', key: 'C', hint: 'Click points · end on a device to connect it · double-click or Enter to finish', modes: ['systems'] },
+  { id: 'bundle', label: 'Bundle', key: 'B', hint: 'Click points for a cable bundle / conduit run', modes: ['systems'] },
+  { id: 'label', label: 'Label', key: 'T', hint: 'Click to place text', modes: ['build', 'systems'] },
+  { id: 'dim', label: 'Measure', key: 'M', hint: 'Click two points', modes: ['build', 'systems'] },
 ];
+export const modeOf = (t: Tool): Mode | null => { const m = TOOLS.find(x => x.id === t)?.modes; return m && m.length === 1 ? m[0]! : null; };
 
 export const CABLE_TYPES = [
   { id: 'cat6', label: 'Cat6', category: 'network' }, { id: 'cat6a', label: 'Cat6A', category: 'network' }, { id: 'cat5e', label: 'Cat5e', category: 'network' },
@@ -24,7 +26,6 @@ export const CABLE_TYPES = [
 ];
 export const cableInfo = (id: string) => CABLE_TYPES.find(c => c.id === id) ?? { id, label: id, category: 'network' };
 
-export const MATERIALS = [{ id: 'floor', label: 'Floor' }, { id: 'grass', label: 'Grass / yard' }, { id: 'concrete', label: 'Concrete' }, { id: 'gravel', label: 'Gravel' }, { id: 'room', label: 'Room' }];
 
 /** Next free tag for a device type: "CD-1", "CD-2" … */
 export function nextTag(store: EditorStore, prefix: string): string {
