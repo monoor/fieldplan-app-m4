@@ -7,12 +7,13 @@ import { CABLE_TYPES, cableInfo, nextTag } from './tools';
 import { dist, type P } from './geometry';
 import { styleName } from './coneStyle';
 import type { EditorStore, Rec } from './store';
+import { isPanelType, panelOf } from './PanelDialog';
 
 type Set = (fields: Record<string, unknown>, key?: string) => void;
 
 const num = (v: string) => (v.trim() === '' ? undefined : Number(v));
 
-export function Inspector({ store, sel, scale, onSelect }: { store: EditorStore; sel: ReadonlySet<string>; scale: number; onSelect: (ids: string[]) => void }) {
+export function Inspector({ store, sel, scale, onSelect, onOpenPanel }: { store: EditorStore; sel: ReadonlySet<string>; scale: number; onSelect: (ids: string[]) => void; onOpenPanel: (id: string) => void }) {
   const recs = [...sel].map(id => store.get(id)).filter((r): r is Rec => !!r);
   if (!recs.length) return null;
   if (recs.length > 1) return (
@@ -26,7 +27,7 @@ export function Inspector({ store, sel, scale, onSelect }: { store: EditorStore;
   return (
     <div className="inspector">
       <div className="row"><h3 className="grow">{title}</h3><button className="btn sm danger" onClick={remove}>Delete</button></div>
-      {r.kind === 'device' && <DeviceProps store={store} r={r} set={set} scale={scale} onSelect={onSelect} />}
+      {r.kind === 'device' && <DeviceProps store={store} r={r} set={set} scale={scale} onSelect={onSelect} onOpenPanel={onOpenPanel} />}
       {r.kind === 'wall' && <>
         <L t="Wall style"><select value={wallMat(r.data.mat).id} onChange={e => set({ mat: e.target.value, thick: wallMat(e.target.value).thick })}>{WALL_MATS.map(m => <option key={m.id} value={m.id}>{m.label}</option>)}</select></L>
         <L t="Thickness (in)"><input type="number" min={1} max={60} step={0.5} value={r.data.thick ?? 4.5} onChange={e => set({ thick: num(e.target.value) ?? 4.5 })} /></L>
@@ -56,7 +57,7 @@ export function Inspector({ store, sel, scale, onSelect }: { store: EditorStore;
 const L = ({ t, children }: { t: string; children: React.ReactNode }) => <label className="prop"><span>{t}</span>{children}</label>;
 const pathLen = (pts: P[]) => pts.reduce((s, p, i) => (i ? s + dist(pts[i - 1]!, p) : 0), 0);
 
-function DeviceProps({ store, r, set, scale, onSelect }: { store: EditorStore; r: Rec; set: Set; scale: number; onSelect: (ids: string[]) => void }) {
+function DeviceProps({ store, r, set, scale, onSelect, onOpenPanel }: { store: EditorStore; r: Rec; set: Set; scale: number; onSelect: (ids: string[]) => void; onOpenPanel: (id: string) => void }) {
   const d = r.data, t = deviceType(d.typeId), cov = coverageOf(d);
   const changeType = (typeId: string) => {
     const nt = deviceType(typeId); if (!nt) return;
@@ -86,6 +87,8 @@ function DeviceProps({ store, r, set, scale, onSelect }: { store: EditorStore; r
       <L t="Power draw (W)"><input type="number" min={0} step={0.5} value={d.watts ?? ''} onChange={e => set({ watts: num(e.target.value) })} /></L>
       <L t="Colour"><span className="row"><input type="color" value={d.color ?? '#5fb8ff'} onChange={e => set({ color: e.target.value })} />{d.color && <button className="btn sm" onClick={() => set({ color: undefined })}>Auto</button>}</span></L>
     </div>
+    {isPanelType(d.typeId) && (() => { const pn = panelOf(r); return <button className="btn primary" onClick={() => onOpenPanel(r.id)}>Open panel · {pn.bkrs.length} breakers · {pn.bus} A</button>; })()}
+    <PoweredFrom store={store} r={r} set={set} />
     <PortsEditor typeId={d.typeId} ports={d.ports} poeBudget={d.poeBudget} onChange={(ports, extra) => set({ ports, ...extra }, r.id + ':ports')} generic={d.typeId === 'generic' || d.typeId === 'generic-sw'} />
     <L t="Notes (internal)"><textarea rows={3} maxLength={5000} value={d.notes ?? ''} onChange={e => set({ notes: e.target.value || undefined })} /></L>
     <div className="row"><button className="btn sm" onClick={dup}>Duplicate</button><span className="muted small">{(d.x / scale).toFixed(1)}′, {(d.y / scale).toFixed(1)}′</span></div>
@@ -157,4 +160,17 @@ function UnderlayProps({ r, set, scale }: { r: Rec; set: Set; scale: number }) {
 export async function uploadUnderlay(file: File): Promise<{ sha256: string; mime: string }> {
   const fd = new FormData(); fd.append('file', file);
   return api<{ sha256: string; mime: string; size: number }>('/api/files', { method: 'POST', body: fd });
+}
+
+/** "Powered from": which panel and breaker feeds this device. */
+function PoweredFrom({ store, r, set }: { store: EditorStore; r: Rec; set: Set }) {
+  const panels = store.all().filter(x => x.kind === 'device' && isPanelType(x.data.typeId) && x.id !== r.id);
+  if (!panels.length) return null;
+  const feed = r.data.feed as { src?: string; bkr?: string } | undefined, src = panels.find(x => x.id === feed?.src), bk = src ? panelOf(src).bkrs : [];
+  return (
+    <div className="grid2c">
+      <L t="Powered from"><select value={feed?.src ?? ''} onChange={e => set({ feed: e.target.value ? { src: e.target.value } : undefined }, r.id + ':feed')}><option value="">—</option>{panels.map(x => <option key={x.id} value={x.id}>{x.data.tag ?? x.data.typeId}</option>)}</select></L>
+      <L t="Breaker"><select value={feed?.bkr ?? ''} disabled={!src} onChange={e => set({ feed: { src: feed!.src, bkr: e.target.value || undefined } }, r.id + ':feed')}><option value="">—</option>{bk.map(b => <option key={b.id} value={b.id}>{b.slot} · {b.amps}A {b.desc}</option>)}</select></L>
+    </div>
+  );
 }

@@ -7,6 +7,7 @@ import { useMe } from '../App';
 import { EditorStore, useStoreVersion } from '../editor/store';
 import { EditorCanvas, type Placement } from '../editor/EditorCanvas';
 import { Palette, type Picks } from '../editor/Palette';
+import { PanelDialog, panelOf } from '../editor/PanelDialog';
 import { ExportMenu } from '../editor/ExportMenu';
 import { Inspector, uploadUnderlay } from '../editor/Inspector';
 import { useConeOptions } from '../editor/ConeControls';
@@ -38,6 +39,7 @@ function EditorShell({ id, snapshot }: { id: string; snapshot: Snapshot }) {
   const changeTool = (t: Tool) => { const m = modeOf(t); if (m) setModeState(m); setTool(t); if (t !== 'select') setSel(new Set()); };
   const [sel, setSel] = useState<ReadonlySet<string>>(new Set());
   const [cones, setCones] = useConeOptions();
+  const [panelId, setPanelId] = useState<string | null>(null);
   const [snapOn, setSnapOn] = useState(true), [msg, setMsg] = useState('');
   const fileIn = useRef<HTMLInputElement>(null);
 
@@ -95,11 +97,12 @@ function EditorShell({ id, snapshot }: { id: string; snapshot: Snapshot }) {
         <span className={'save ' + state} title={store.lastError}>{state === 'saved' ? 'Saved' : state === 'saving' ? 'Saving…' : state === 'dirty' ? 'Unsaved…' : 'Not saved — ' + (store.lastError || 'offline') + ' (retrying)'}</span>
       </div>
       {msg && <div className="ok small" onClick={() => setMsg('')}>{msg}</div>}
+      {panelId && store.get(panelId) && <PanelDialog dev={store.get(panelId)!} devs={store.all().filter(r => r.kind === 'device')} onClose={() => setPanelId(null)} onChange={pn => store.edit(tx => tx.patch(panelId, { panel: pn }), 'panel:' + panelId)} />}
       <div className="editor-body">
         <Palette mode={mode} setMode={setMode} tool={tool} setTool={changeTool} placement={placement} setPlacement={setPlacement} picks={picks} setPick={setPick} />
         <div className="canvas-wrap">
           {current ? <EditorCanvas store={store} sheetId={current.id} scale={scale} gridFt={gridFt} tool={tool} setTool={changeTool} placement={placement} cableType={picks.cable} matId={picks.surface} wallMatId={picks.wall} doorType={picks.door} windowType={picks.window} sel={sel} setSel={setSel} cones={cones} setCones={setCones} snapOn={snapOn} /> : <div className="plan" />}
-          {sel.size > 0 && <aside className="inspector float"><Inspector store={store} sel={sel} scale={scale} onSelect={ids => setSel(new Set(ids))} /></aside>}
+          {sel.size > 0 && <aside className="inspector float"><Inspector store={store} sel={sel} scale={scale} onSelect={ids => setSel(new Set(ids))} onOpenPanel={setPanelId} /></aside>}
         </div>
       </div>
     </div>

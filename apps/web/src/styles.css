@@ -261,3 +261,18 @@ kbd { font: 10px var(--mono); color: var(--muted); }
 @media (max-width: 1000px) { .inspector.float { left: 8px; width: auto; top: auto; bottom: 30px; max-height: 45%; } .tools { grid-template-columns: repeat(3, 1fr); } .editor-body { grid-template-columns: 200px minmax(0, 1fr); } }
 @media (max-width: 640px) { .editor-body { grid-template-columns: minmax(0, 1fr); grid-template-rows: auto minmax(0, 1fr); } .palette { max-height: 34vh; flex-direction: column; } }
 .plan-tools { z-index: 6; }
+
+/* ---- Panel dialog & schedule ---- */
+.modal-back { position: fixed; inset: 0; background: #000a; z-index: 50; display: flex; align-items: flex-start; justify-content: center; padding: 4vh 16px; overflow-y: auto; }
+.modal { background: var(--panel); border: 1px solid var(--line); border-radius: 12px; padding: 16px; width: min(1040px, 100%); display: flex; flex-direction: column; gap: 12px; box-shadow: 0 20px 60px #000c; }
+.modal h2 { margin: 0; font-size: 18px; }
+.modal-body { display: grid; grid-template-columns: minmax(0, 400px) minmax(0, 1fr); gap: 12px; align-items: start; }
+.modal .col { display: flex; flex-direction: column; gap: 12px; min-width: 0; }
+.grid3c { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; }
+.bk-grid { display: grid; grid-template-columns: 50px minmax(80px, 1fr) 58px 62px 74px 66px; gap: 4px; align-items: center; margin-top: 4px; }
+.bk-grid.head { color: var(--muted); font: 10px var(--mono); text-transform: uppercase; margin-top: 8px; }
+.bk-grid input, .bk-grid select { width: 100%; min-width: 0; }
+.bk-grid input.err { border-color: var(--danger); }
+.bk-note { margin: 2px 0 4px 58px; }
+.table.compact td { padding: 3px 8px; font-size: 12px; }
+@media (max-width: 860px) { .modal-body { grid-template-columns: 1fr; } .grid3c { grid-template-columns: 1fr 1fr; } }

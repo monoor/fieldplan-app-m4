@@ -5,6 +5,7 @@ import type { ProjectRecord, ProjectSummary } from '@fieldplan/shared';
 import { api, can, fileUrl, fmtDate } from '../api';
 import { useMe } from '../App';
 import { PlanView } from '../components/PlanView';
+import { PanelSchedule, panelsOf } from '../components/PanelSchedule';
 import { ExportMenu } from '../editor/ExportMenu';
 import { loadConeOptions } from '../editor/coneStyle';
 import type { SceneRec } from '../editor/Scene';
@@ -19,7 +20,7 @@ export function sheetsOf(records: ProjectRecord[]) {
 export function ProjectView() {
   const { id = '' } = useParams(), me = useMe().data, qc = useQueryClient(), nav = useNavigate();
   const snap = useQuery({ queryKey: ['project', id], queryFn: () => api<Snapshot>('/api/projects/' + encodeURIComponent(id) + '/snapshot') });
-  const [sheet, setSheet] = useState<string | null>(null), [tab, setTab] = useState<'plan' | 'devices' | 'share'>('plan');
+  const [sheet, setSheet] = useState<string | null>(null), [tab, setTab] = useState<'plan' | 'devices' | 'panels' | 'share'>('plan');
   const [editing, setEditing] = useState(false), [form, setForm] = useState({ name: '', client: '' }), [err, setErr] = useState('');
 
   const save = useMutation({
@@ -63,9 +64,10 @@ export function ProjectView() {
       <div className="tabs">
         <button className={tab === 'plan' ? 'on' : ''} onClick={() => setTab('plan')}>Plan</button>
         <button className={tab === 'devices' ? 'on' : ''} onClick={() => setTab('devices')}>Devices</button>
+        {panelsOf(records).length > 0 && <button className={tab === 'panels' ? 'on' : ''} onClick={() => setTab('panels')}>Panels</button>}
         {can(me, 'share:manage') && <button className={tab === 'share' ? 'on' : ''} onClick={() => setTab('share')}>Client links</button>}
         <span className="spacer" />
-        {tab !== 'share' && sheets.length > 1 && (
+        {tab !== 'share' && tab !== 'panels' && sheets.length > 1 && (
           <select value={current?.id} onChange={e => setSheet(e.target.value)}>{sheets.map(s => <option key={s.id} value={s.id}>{s.name}</option>)}</select>
         )}
       </div>
@@ -74,6 +76,7 @@ export function ProjectView() {
         <PlanView records={records} sheetId={current.id} fileUrl={fileUrl} scale={scale} />
       </> : <p className="muted">This project has no sheets.</p>)}
       {tab === 'devices' && current && <DeviceTable records={records} sheetId={current.id} />}
+      {tab === 'panels' && <PanelSchedule records={records} projectName={project.name} />}
       {tab === 'share' && <Shares projectId={id} sheets={sheets} />}
     </div>
   );
