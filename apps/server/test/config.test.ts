@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest';
 import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
-import { loadConfig } from '../src/config.js';
+import { loadConfig, writeRuntime } from '../src/config.js';
 
 const dir = () => fs.mkdtempSync(path.join(os.tmpdir(), 'fp-cfg-'));
 
@@ -38,5 +38,13 @@ describe('client IP behind a proxy', () => {
     };
     expect(await ipOf('1')).toBe('203.0.113.9');
     expect(await ipOf('')).toBe('127.0.0.1');
+  });
+
+  it('saved runtime settings in /data win over blank container variables', () => {
+    const d = dir(); writeRuntime(d, { PUBLIC_URL: 'https://plans.example.com/', TRUST_PROXY: '1', ANTHROPIC_API_KEY: 'sk-ant-abcdefghij' });
+    const c = loadConfig({ DATA_DIR: d, PUBLIC_URL: '', TRUST_PROXY: '', ANTHROPIC_API_KEY: '' });
+    expect(c.publicUrl).toBe('https://plans.example.com'); expect(c.trustProxy).toBe(1); expect(c.claude.apiKey).toBe('sk-ant-abcdefghij');
+    writeRuntime(d, { PUBLIC_URL: '', ANTHROPIC_API_KEY: '' });
+    expect(loadConfig({ DATA_DIR: d }).publicUrl).toBeNull();
   });
 });

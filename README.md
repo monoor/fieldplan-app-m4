@@ -17,7 +17,7 @@ Back up the data folder (`fieldplan.db`, `files/`, `auth-secret`).
 |---|---|
 | `PUBLIC_URL` | `https://…` when behind a reverse proxy (turns on Secure cookies/HSTS) |
 | `TRUST_PROXY` | Number of proxy hops in front (usually `1`) |
-| `ANTHROPIC_API_KEY` | Optional: Claude reads product pages and datasheets during import |
+| `ANTHROPIC_API_KEY` | Optional: Claude reads product pages and datasheets during import. Can also be set in Settings → Connection & API key (stored in `/data`, wins over this variable) |
 | `CLAUDE_MODEL`, `CLAUDE_DAILY_LIMIT` | Model and daily call cap (also editable in Settings) |
 | `IMPORT_ALLOWED_DOMAINS` | Comma list; empty = any public site |
 | `MAX_UPLOAD_MB`, `PUID`, `PGID`, `PORT`, `DATA_DIR`, `AUTH_SECRET`, `LOG_LEVEL` | See `apps/server/src/config.ts` |

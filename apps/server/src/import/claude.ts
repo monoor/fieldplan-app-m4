@@ -32,13 +32,15 @@ const SYSTEM = [
 ].join('\n');
 
 export function createClaude(db: DB, cfg: Config, settings: Settings) {
-  const client = cfg.claude.apiKey ? new Anthropic({ apiKey: cfg.claude.apiKey, maxRetries: 2, timeout: 120_000 }) : null;
+  let cached: { key: string; c: Anthropic } | null = null;
+  const getClient = () => { const k = cfg.claude.apiKey; if (!k) return null; if (cached?.key !== k) cached = { key: k, c: new Anthropic({ apiKey: k, maxRetries: 2, timeout: 120_000 }) }; return cached.c; };
   const today = () => new Date().toISOString().slice(0, 10);
   const usedToday = () => db.select().from(schema.importUsage).where(eq(schema.importUsage.day, today())).get()?.claudeCalls ?? 0;
 
   function ready(): Anthropic {
     const s = settings.effective();
-    if (!client) throw new HttpError(409, 'Claude import is not set up: add ANTHROPIC_API_KEY to the container');
+    const client = getClient();
+    if (!client) throw new HttpError(409, 'Claude import is not set up: add an API key in Settings');
     if (!s.claudeEnabled) throw new HttpError(409, 'Claude import is turned off in Settings');
     if (usedToday() >= s.claudeDailyLimit) throw new HttpError(429, 'Daily Claude import limit reached (' + s.claudeDailyLimit + '); it resets at midnight UTC');
     return client;
@@ -61,7 +63,7 @@ export function createClaude(db: DB, cfg: Config, settings: Settings) {
   }
 
   return {
-    status() { const s = settings.effective(); return { configured: !!client, enabled: s.claudeEnabled, model: s.claudeModel, usedToday: usedToday(), dailyLimit: s.claudeDailyLimit }; },
+    status() { const s = settings.effective(); return { configured: !!cfg.claude.apiKey, enabled: s.claudeEnabled, model: s.claudeModel, usedToday: usedToday(), dailyLimit: s.claudeDailyLimit }; },
 
     async extract(input: { url: string; text?: string; pdf?: Buffer }): Promise<{ item: Partial<CatalogItemInput>; datasheetUrl?: string; imageUrl?: string; warnings: string[] }> {
       const c = ready();

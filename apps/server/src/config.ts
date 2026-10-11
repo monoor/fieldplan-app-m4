@@ -42,6 +42,10 @@ export interface Config {
 export function loadConfig(env: NodeJS.ProcessEnv = process.env, overrides: Partial<Config> = {}): Config {
   // Unraid passes every template variable, including empty ones: treat blank as "not set" so defaults apply.
   const clean = Object.fromEntries(Object.keys(Env.shape).map(k => [k, env[k]?.trim() || undefined]));
+  // Values saved from the Settings page live in the data volume and win over the container's variables, so a
+  // template reset on the host can't wipe them.
+  const early = path.resolve(overrides.dataDir ?? clean.DATA_DIR ?? '/data');
+  for (const [k, v] of Object.entries(readRuntime(early))) if (v) clean[k] = v;
   const r = Env.safeParse(clean);
   if (!r.success) throw new Error('Invalid settings: ' + r.error.issues.map(i => i.path.join('.') + ' — ' + i.message).join('; '));
   const e = r.data;
@@ -58,6 +62,19 @@ export function loadConfig(env: NodeJS.ProcessEnv = process.env, overrides: Part
     importAllowedDomains: e.IMPORT_ALLOWED_DOMAINS.map(d => d.toLowerCase().replace(/^\*\./, '')),
   };
   return { ...cfg, ...overrides, dataDir };
+}
+
+export const RUNTIME_KEYS = ['PUBLIC_URL', 'TRUST_PROXY', 'ANTHROPIC_API_KEY'] as const;
+export type RuntimeKey = typeof RUNTIME_KEYS[number];
+const runtimeFile = (dataDir: string) => path.join(dataDir, 'runtime-config.json');
+export function readRuntime(dataDir: string): Partial<Record<RuntimeKey, string>> {
+  try { const j = JSON.parse(fs.readFileSync(runtimeFile(dataDir), 'utf8')) as Record<string, unknown>; return Object.fromEntries(RUNTIME_KEYS.filter(k => typeof j[k] === 'string').map(k => [k, j[k] as string])); } catch { return {}; }
+}
+/** Merge into the saved file; an empty string removes the key (the container variable applies again). */
+export function writeRuntime(dataDir: string, patch: Partial<Record<RuntimeKey, string>>) {
+  const cur: Record<string, string> = { ...readRuntime(dataDir) };
+  for (const [k, v] of Object.entries(patch)) { if (v === undefined) continue; if (v.trim()) cur[k] = v.trim(); else delete cur[k]; }
+  fs.writeFileSync(runtimeFile(dataDir), JSON.stringify(cur, null, 2) + '\n', { mode: 0o600 });
 }
 
 /** Generated once and kept in the data volume (mode 600) so sessions survive restarts. */

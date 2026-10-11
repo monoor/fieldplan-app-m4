@@ -181,6 +181,7 @@ function Users() {
 interface SettingsData {
   claudeConfigured: boolean; claudeEnabled: boolean; claudeModel: string; claudeDailyLimit: number; importAllowedDomains: string[];
   claude: { configured: boolean; enabled: boolean; model: string; usedToday: number; dailyLimit: number }; version: string; publicUrl: string | null; trustProxy: boolean | string | number;
+  saved: { publicUrl: string; trustProxy: string; hasKey: boolean };
 }
 const MODELS = ['claude-sonnet-5-5', 'claude-haiku-5-5', 'claude-opus-5-5'];
 
@@ -214,7 +215,7 @@ function ImportSettings() {
           <p className="small">An Anthropic API key is set on the server. Claude reads product pages and datasheet PDFs and fills in the catalog form; you review every field before saving. Each import uses one API call.</p>
         ) : (
           <div className="small">
-            <p>No API key is set, so imports only read published product data. To turn this on, add the variable <code>ANTHROPIC_API_KEY</code> to the container (Unraid: edit the container, fill in “Anthropic API key”, Apply). The key is never stored in the database or shown here.</p>
+            <p>No API key is set, so imports only read published product data. To turn this on, paste your API key in “Connection & API key” below. It is stored in the data folder and never shown again.</p>
           </div>
         )}
         <label className="inline"><input type="checkbox" checked={f.enabled} disabled={!d.claudeConfigured} onChange={e => setF({ ...f, enabled: e.target.checked })} /> Use Claude for imports</label>
@@ -230,8 +231,30 @@ function ImportSettings() {
           {d.claudeConfigured && <button type="button" className="btn" onClick={() => void runTest()} disabled={test.busy}>{test.busy ? 'Testing…' : 'Test connection'}</button>}</div>
         {test.ok && <div className="ok">{test.ok}</div>}{test.bad && <div className="bad">{test.bad}</div>}
       </form>
+      <ConnectionCard d={d} onSaved={() => { void qc.invalidateQueries({ queryKey: ['settings'] }); void qc.invalidateQueries({ queryKey: ['import-status'] }); }} />
       <div className="card small muted">Server: version {d.version} · public URL {d.publicUrl ?? 'not set (LAN)'} · trust proxy {String(d.trustProxy)}</div>
     </div>
+  );
+}
+
+function ConnectionCard({ d, onSaved }: { d: SettingsData; onSaved: () => void }) {
+  const [url, setUrl] = useState(d.saved.publicUrl || d.publicUrl || ''), [proxy, setProxy] = useState(d.saved.trustProxy || (d.trustProxy ? String(d.trustProxy) : '')), [key, setKey] = useState('');
+  const [msg, setMsg] = useState<{ ok?: string; bad?: string }>({});
+  const save = useMutation({
+    mutationFn: (clearKey: boolean) => api<{ restartNeeded: boolean }>('/api/settings/connection', { method: 'PUT', json: { publicUrl: url.trim(), trustProxy: proxy.trim(), ...(clearKey ? { anthropicApiKey: '' } : key.trim() ? { anthropicApiKey: key.trim() } : {}) } }),
+    onSuccess: r => { setKey(''); setMsg({ ok: r.restartNeeded && (url.trim() !== (d.publicUrl ?? '') || proxy.trim() !== (d.trustProxy ? String(d.trustProxy) : '')) ? 'Saved in /data. Restart the container once to apply the URL / proxy change.' : 'Saved in /data.' }); onSaved(); },
+    onError: e => setMsg({ bad: e.message }),
+  });
+  return (
+    <form className="card form narrow" onSubmit={e => { e.preventDefault(); setMsg({}); save.mutate(false); }}>
+      <h3>Connection &amp; API key</h3>
+      <p className="muted small">Stored in the data folder, so they survive Unraid template resets and updates. They override the container variables of the same name.</p>
+      <label>Anthropic API key {d.saved.hasKey && <span className="ok small">· saved</span>}<input type="password" autoComplete="off" placeholder={d.saved.hasKey ? '•••••••• (leave blank to keep)' : d.claudeConfigured ? 'Set by container variable' : 'sk-ant-…'} value={key} onChange={e => setKey(e.target.value)} /></label>
+      <label>Public URL<input value={url} onChange={e => setUrl(e.target.value)} placeholder="https://plans.example.com — empty on a LAN" /></label>
+      <label>Trust proxy (number of reverse proxies)<input value={proxy} onChange={e => setProxy(e.target.value)} placeholder="1 — empty on a LAN" /></label>
+      {msg.bad && <div className="bad">{msg.bad}</div>}{msg.ok && <div className="ok">{msg.ok}</div>}
+      <div className="row"><button className="btn primary" disabled={save.isPending}>Save</button>{d.saved.hasKey && <button type="button" className="btn" onClick={() => save.mutate(true)}>Remove saved key</button>}</div>
+    </form>
   );
 }
 
