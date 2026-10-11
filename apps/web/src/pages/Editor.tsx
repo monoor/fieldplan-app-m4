@@ -10,6 +10,8 @@ import { Palette, type Picks } from '../editor/Palette';
 import { ChecksView, useChecks } from '../components/ChecksView';
 import { PanelDialog } from '../editor/PanelDialog';
 import { ExportMenu } from '../editor/ExportMenu';
+import { CanvasDialog } from '../editor/CanvasDialog';
+import { canvasOf } from '../editor/canvas';
 import { Inspector, uploadUnderlay } from '../editor/Inspector';
 import { useConeOptions } from '../editor/ConeControls';
 import { modeOf, type Mode, type Tool } from '../editor/tools';
@@ -41,12 +43,12 @@ function EditorShell({ id, snapshot }: { id: string; snapshot: Snapshot }) {
   const [sel, setSel] = useState<ReadonlySet<string>>(new Set());
   const [cones, setCones] = useConeOptions();
   const [panelId, setPanelId] = useState<string | null>(null), [checksOpen, setChecksOpen] = useState(false);
-  const [snapOn, setSnapOn] = useState(true), [msg, setMsg] = useState('');
+  const [canvasOpen, setCanvasOpen] = useState(false), [snapOn, setSnapOn] = useState(true), [msg, setMsg] = useState('');
   const fileIn = useRef<HTMLInputElement>(null);
 
   const sheets = store.sheets(), meta = store.meta()?.data ?? {};
   const current = sheets.find(s => s.id === sheetId) ?? sheets[0];
-  const scale = Number(meta.scale) || 20, gridFt = Number(meta.gridFt) || 1;
+  const scale = Number(meta.scale) || 20, gridFt = Number(meta.gridFt) || 1, canvas = canvasOf(meta);
 
   // Make sure there is always a sheet to draw on.
   useEffect(() => { if (!store.sheets().length) store.edit(tx => tx.put({ id: newId(), kind: 'sheet', sheetId: null, data: { name: 'Floor 1', order: 0 } })); }, [store]);
@@ -90,24 +92,28 @@ function EditorShell({ id, snapshot }: { id: string; snapshot: Snapshot }) {
           <button className="btn sm" onClick={addSheet}>Add sheet</button><button className="btn sm" onClick={renameSheet}>Rename</button>
           {sheets.length > 1 && <button className="btn sm danger" onClick={deleteSheet}>Delete sheet</button>}
           <button className="btn sm" onClick={() => (ul ? setSel(new Set([ul.id])) : fileIn.current?.click())}>{ul ? 'Edit underlay' : 'Add underlay image'}</button>
+          <button className="btn sm" onClick={() => setCanvasOpen(true)}>Canvas &amp; scale…</button>
           <label className="inline small"><input type="checkbox" checked={snapOn} onChange={e => setSnapOn(e.target.checked)} /> Snap to {gridFt}′ grid</label>
         </div></details>
         <input ref={fileIn} type="file" accept="image/png,image/jpeg,image/webp,image/gif" hidden onChange={e => { const f = e.target.files?.[0]; e.target.value = ''; if (f) void addUnderlay(f); }} />
+        <button className="btn sm" onClick={() => setCanvasOpen(true)} title="Canvas size and drawing scale">{canvas ? canvas.w + '′×' + canvas.h + '′' : 'Canvas'} · {scale} px/ft</button>
         <button className="btn sm" disabled={!store.canUndo} onClick={() => store.undo()} title="Undo (Ctrl+Z)">↶</button>
         <button className="btn sm" disabled={!store.canRedo} onClick={() => store.redo()} title="Redo (Ctrl+Shift+Z)">↷</button>
-        <ExportMenu allSheets={() => sheets.map(sh => ({ name: String(sh.data.name), recs: store.ofSheet(sh.id) as SceneRec[] }))} recs={() => (current ? (store.ofSheet(current.id) as SceneRec[]) : [])} cones={cones} projectName={name} client={snapshot.project.client} sheetName={String(current?.data.name ?? 'Sheet')} scale={scale} />
+        <ExportMenu allSheets={() => sheets.map(sh => ({ name: String(sh.data.name), recs: store.ofSheet(sh.id) as SceneRec[] }))} recs={() => (current ? (store.ofSheet(current.id) as SceneRec[]) : [])} cones={cones} projectName={name} client={snapshot.project.client} sheetName={String(current?.data.name ?? 'Sheet')} scale={scale} canvas={canvas} />
         <button className={'btn sm' + (issues ? ' warn-btn' : '')} onClick={() => setChecksOpen(true)}>Checks{issues ? ' (' + issues + ')' : ''}</button>
         <span className="spacer" />
         {store.conflicts > 0 && <span className="warn-chip" title="Another device changed the same items; your version was kept">{store.conflicts} overwritten</span>}
         <span className={'save ' + state} title={store.lastError}>{state === 'saved' ? 'Saved' : state === 'saving' ? 'Saving…' : state === 'dirty' ? 'Unsaved…' : 'Not saved — ' + (store.lastError || 'offline') + ' (retrying)'}</span>
       </div>
+      {canvasOpen && <CanvasDialog initial={{ canvas, scale, gridFt }} dims={current ? store.ofSheet(current.id).filter(r => r.kind === 'dim' && Array.isArray(r.data.points) && r.data.points.length >= 2) : []}
+        onClose={() => setCanvasOpen(false)} onApply={v => store.edit(tx => tx.patch('meta', { ...v }))} />}
       {msg && <div className="ok small" onClick={() => setMsg('')}>{msg}</div>}
       {checksOpen && <div className="modal-back" onPointerDown={e => { if (e.target === e.currentTarget) setChecksOpen(false); }}><div className="modal wide"><div className="row"><h2 className="grow">Checks</h2><button className="btn" onClick={() => setChecksOpen(false)}>Done</button></div><ChecksView records={allRecs} scale={scale} projectName={name} onPick={pick} /></div></div>}
       {panelId && store.get(panelId) && <PanelDialog dev={store.get(panelId)!} devs={store.all().filter(r => r.kind === 'device')} onClose={() => setPanelId(null)} onChange={pn => store.edit(tx => tx.patch(panelId, { panel: pn }), 'panel:' + panelId)} />}
       <div className="editor-body">
         <Palette mode={mode} setMode={setMode} tool={tool} setTool={changeTool} placement={placement} setPlacement={setPlacement} picks={picks} setPick={setPick} />
         <div className="canvas-wrap">
-          {current ? <EditorCanvas store={store} sheetId={current.id} scale={scale} gridFt={gridFt} tool={tool} setTool={changeTool} placement={placement} cableType={picks.cable} matId={picks.surface} wallMatId={picks.wall} doorType={picks.door} windowType={picks.window} sel={sel} setSel={setSel} cones={cones} setCones={setCones} snapOn={snapOn} /> : <div className="plan" />}
+          {current ? <EditorCanvas store={store} sheetId={current.id} scale={scale} gridFt={gridFt} canvas={canvas} tool={tool} setTool={changeTool} placement={placement} cableType={picks.cable} matId={picks.surface} wallMatId={picks.wall} doorType={picks.door} windowType={picks.window} sel={sel} setSel={setSel} cones={cones} setCones={setCones} snapOn={snapOn} /> : <div className="plan" />}
           {sel.size > 0 && <aside className="inspector float"><Inspector store={store} sel={sel} scale={scale} onSelect={ids => setSel(new Set(ids))} onOpenPanel={setPanelId} /></aside>}
         </div>
       </div>

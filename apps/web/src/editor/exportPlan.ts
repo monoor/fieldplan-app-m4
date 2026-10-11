@@ -1,4 +1,5 @@
 // Export a sheet as SVG / PNG / PDF: print-style colours, title block and a legend of what's on the drawing.
+import type { Canvas } from './canvas';
 import { createElement } from 'react';
 import { renderToStaticMarkup } from 'react-dom/server';
 import { DEFAULT_BOM, DEVICE_TYPES, analyze, buildBom, surfaceMat, wallMat, wireFor, type ProjectRecord, type Rec } from '@fieldplan/shared';
@@ -10,7 +11,7 @@ import { CABLE_TYPES } from './tools';
 
 export type ExportFormat = 'svg' | 'png' | 'pdf';
 export const PAPERS = { letter: { label: 'Letter 11×8.5″', w: 11, h: 8.5 }, tabloid: { label: 'Tabloid 17×11″', w: 17, h: 11 }, archd: { label: 'ARCH D 36×24″', w: 36, h: 24 } } as const;
-export interface ExportOpts { fmt: ExportFormat; paper: keyof typeof PAPERS; legend: boolean; cones: ConeOptions; projectName: string; client?: string | null; sheetName: string; scale: number }
+export interface ExportOpts { fmt: ExportFormat; paper: keyof typeof PAPERS; legend: boolean; cones: ConeOptions; projectName: string; client?: string | null; sheetName: string; scale: number; canvas?: Canvas | null; crop?: boolean }
 
 const esc = (s: string) => s.replace(/[&<>"]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' })[c]!);
 const SANS = 'system-ui, -apple-system, Segoe UI, Roboto, Helvetica, Arial, sans-serif';
@@ -26,7 +27,7 @@ export async function buildSheetSvg(records: (SceneRec | ProjectRecord)[], o: Ex
   const paper = PAPERS[o.paper], W = paper.w * 96, H = paper.h * 96, m = 0.4 * 96, tbH = 0.9 * 96, legW = o.legend ? Math.min(3.2, paper.w * 0.22) * 96 : 0;
   const urls = new Map<string, string>();
   for (const r of recs) if (r.kind === 'underlay' && r.data.fileSha && !urls.has(r.data.fileSha)) urls.set(r.data.fileSha, await dataUrl(fileUrl(r.data.fileSha)));
-  const b = bounds(recs, o.scale), bw = b.x1 - b.x0, bh = b.y1 - b.y0;
+  const b = bounds(recs, o.scale, o.crop ? null : o.canvas), bw = b.x1 - b.x0, bh = b.y1 - b.y0;
   const px = m, py = m, pw = W - m * 2 - legW, ph = H - m * 2 - tbH - 6;
   const fit = Math.min(pw / bw, ph / bh), ox = px + (pw - bw * fit) / 2, oy = py + (ph - bh * fit) / 2;
   const plan = renderToStaticMarkup(createElement(Scene, { recs, scale: o.scale, fileUrl: s => urls.get(s) ?? '', cones: o.cones, light: true, unit: 1 / fit }));

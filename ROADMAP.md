@@ -7,3 +7,6 @@
 - **M4 Offline tablets:** PWA with local record store, outbox and sync (pull since seq, push with baseSeq, conflict review).
 - **M5 Catalog sync (done):** Refresh from source page (price per site, fills empty specs), Refresh prices for all items, price age flags. Vendor feeds and per-vendor camera model packs are not built.
 - **M6 Outputs (done):** BOM tab (catalog prices, overrides, slack, markup, labor, CSV), printable client proposal, plan export (SVG/PNG/PDF), multi-sheet PDF set with panel, cable and quantity schedules.
+
+## Canvas & scale (done)
+Per-project canvas size (ft), drawing scale (px/ft), grid, and calibration from a Measure line (Editor → "Canvas & scale"). New projects default to a 100×70 ft canvas at 20 px/ft; export can use the whole canvas or crop to the drawing.

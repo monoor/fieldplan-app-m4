@@ -1,4 +1,5 @@
 // The interactive plan: drawing tools, selection, dragging, snapping and the pan/zoom viewport.
+import type { Canvas } from './canvas';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { fileUrl } from '../api';
 import { wallMat, surfaceMat } from '@fieldplan/shared';
@@ -13,7 +14,7 @@ import { useStoreVersion, type EditorStore, type Rec } from './store';
 
 export interface Placement { typeId: string; over?: Record<string, unknown> }
 interface Props {
-  store: EditorStore; sheetId: string; scale: number; gridFt: number; tool: Tool; setTool: (t: Tool) => void; placement: Placement;
+  store: EditorStore; sheetId: string; scale: number; gridFt: number; canvas?: Canvas | null; tool: Tool; setTool: (t: Tool) => void; placement: Placement;
   cableType: string; matId: string; wallMatId: string; doorType: string; windowType: string; sel: ReadonlySet<string>; setSel: (s: ReadonlySet<string>) => void; cones: ConeOptions; setCones: (p: Partial<ConeOptions>) => void; snapOn: boolean;
 }
 type Draft = { tool: Tool; points: P[] };
@@ -28,11 +29,11 @@ const DRAW_TOOLS = new Set<Tool>(['wall', 'surface', 'cable', 'bundle', 'dim']);
 const MIN_POINTS: Partial<Record<Tool, number>> = { wall: 2, surface: 3, cable: 2, bundle: 2, dim: 2 };
 
 export function EditorCanvas(props: Props) {
-  const { store, sheetId, scale, gridFt, tool, setTool, placement, cableType, matId, wallMatId, doorType, windowType, sel, setSel, cones, setCones, snapOn } = props;
+  const { store, sheetId, scale, gridFt, canvas, tool, setTool, placement, cableType, matId, wallMatId, doorType, windowType, sel, setSel, cones, setCones, snapOn } = props;
   const version = useStoreVersion(store);
   const box = useRef<HTMLDivElement>(null);
   const recs = useMemo(() => store.ofSheet(sheetId) as SceneRec[], [store, version, sheetId]); // eslint-disable-line react-hooks/exhaustive-deps
-  const vp = useViewport(box, useMemo(() => bounds(recs, scale), [recs, scale]));
+  const vp = useViewport(box, useMemo(() => bounds(recs, scale, canvas), [recs, scale, canvas]));
   const [draft, setDraft] = useState<Draft | null>(null);
   const [cursor, setCursor] = useState<P | null>(null);
   const [hot, setHot] = useState<string | null>(null);
@@ -47,6 +48,12 @@ export function EditorCanvas(props: Props) {
     lastTap.current = dbl ? { t: 0, x: 0, y: 0 } : { t: n, x: e.clientX, y: e.clientY }; return dbl;
   };
   const k = vp.view.k, step = gridFt * scale;
+
+  // Re-frame when the canvas or scale changes.
+  const fitRef = useRef(vp.fit); fitRef.current = vp.fit;
+  const canvasKey = canvas ? canvas.w + 'x' + canvas.h + '@' + scale : '@' + scale;
+  const firstKey = useRef(canvasKey);
+  useEffect(() => { if (firstKey.current !== canvasKey) { firstKey.current = canvasKey; fitRef.current(); } }, [canvasKey]);
 
   // Reset the in-progress drawing when the tool or sheet changes.
   useEffect(() => { setDraft(null); }, [tool, sheetId]);
@@ -235,6 +242,11 @@ export function EditorCanvas(props: Props) {
           <rect width="100%" height="100%" fill="url(#g-minor)" /><rect width="100%" height="100%" fill="url(#g-major)" />
         </>}
         <g transform={`translate(${vp.view.x} ${vp.view.y}) scale(${k})`}>
+          {canvas && <g pointerEvents="none">
+            <path fillRule="evenodd" fill="#000" fillOpacity={0.32} d={`M${-1e6} ${-1e6}H${1e6}V${1e6}H${-1e6}Z M0 0V${canvas.h * scale}H${canvas.w * scale}V0Z`} />
+            <rect width={canvas.w * scale} height={canvas.h * scale} fill="none" stroke="#2f6fa8" strokeDasharray="8 5" vectorEffect="non-scaling-stroke" strokeWidth={1.5} />
+            <text x={canvas.w * scale} y={-6 / k} textAnchor="end" fontSize={11 / k} fill="#5f87ab">{canvas.w}′ × {canvas.h}′ canvas</text>
+          </g>}
           <Scene recs={recs} scale={scale} fileUrl={fileUrl} cones={cones} selected={sel} hot={hot} />
           {handlesFor && selOne && <g className="handles">
             {selOne.kind !== 'dim' && handlesFor.map((p, i) => { const q = handlesFor[(i + 1) % handlesFor.length]!; if (i + 1 >= handlesFor.length && selOne.kind !== 'surface') return null; return <circle key={'m' + i} data-mid={i} cx={(p.x + q.x) / 2} cy={(p.y + q.y) / 2} r={4 / k} className="vtx mid" />; })}

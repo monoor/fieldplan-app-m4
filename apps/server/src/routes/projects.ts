@@ -40,7 +40,7 @@ export default async function projectRoutes(app: FastifyInstance, { store: { db 
     db.transaction(tx => {
       tx.insert(schema.projects).values({ id, name: b.name, client: b.client ?? null, seq: 0, createdAt: at, updatedAt: at, createdBy: req.user!.id }).run();
       const seq = seed(tx, id, [
-        { id: 'meta', kind: 'meta', sheetId: null, data: { name: b.name, client: b.client, scale: 20, gridFt: 1, schemaVersion: SCHEMA_VERSION } },
+        { id: 'meta', kind: 'meta', sheetId: null, data: { name: b.name, client: b.client, scale: 20, gridFt: 1, canvasW: 100, canvasH: 70, schemaVersion: SCHEMA_VERSION } },
         { id: sheetId, kind: 'sheet', sheetId: null, data: { name: 'Floor 1', order: 0 } },
       ], req.user!.id);
       tx.update(schema.projects).set({ seq }).where(eq(schema.projects.id, id)).run();
