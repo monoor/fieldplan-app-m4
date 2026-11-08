@@ -4,6 +4,7 @@
 import { useSyncExternalStore } from 'react';
 import type { ProjectRecord, RecordKind, SyncOp } from '@fieldplan/shared';
 import { api } from '../api';
+import { saveLocal, type LocalRec } from './offline';
 
 export interface Rec { id: string; kind: RecordKind; sheetId: string | null; data: Record<string, any>; seq: number; rev: number } // eslint-disable-line @typescript-eslint/no-explicit-any
 type Change = { id: string; before: Rec | null; after: Rec | null };
@@ -39,9 +40,34 @@ export class EditorStore {
   private retry = 0;
   readonly clientId = Math.random().toString(36).slice(2, 10);
 
-  constructor(readonly projectId: string, snapshot: { seq: number; records: ProjectRecord[] }) {
-    for (const r of snapshot.records) if (!r.deleted) this.recs.set(r.id, { id: r.id, kind: r.kind, sheetId: r.sheetId, data: r.data, seq: r.seq, rev: ++revCounter });
+  /** Edits replayed from this device's outbox when the editor opened. */
+  restored = 0;
+  /** Project summary (name, client) kept with the device copy so the editor can open offline. */
+  project: unknown = null;
+  private persistTimer: ReturnType<typeof setTimeout> | undefined;
+
+  /** `dirty` = ids from this device's outbox that still have to reach the server (their records are already in `snapshot`). */
+  constructor(readonly projectId: string, snapshot: { seq: number; records: (ProjectRecord | LocalRec)[] }, dirty: string[] = []) {
+    for (const r of snapshot.records) if (!('deleted' in r) || !r.deleted) this.recs.set(r.id, { id: r.id, kind: r.kind, sheetId: r.sheetId, data: r.data, seq: r.seq, rev: ++revCounter });
     this.since = snapshot.seq;
+    for (const id of dirty) this.dirty.set(id, ++this.token);
+    this.restored = dirty.length;
+    if (dirty.length) { this.saveState = 'dirty'; this.timer = setTimeout(() => void this.flush(), 300); }
+    if (typeof window !== 'undefined') window.addEventListener('online', this.onOnline);
+  }
+  private onOnline = () => { this.retry = 0; if (this.dirty.size) void this.flush(); else void this.refresh(); };
+  get offline() { return typeof navigator !== 'undefined' && navigator.onLine === false; }
+  get pending() { return this.dirty.size; }
+
+  /** Keep the device copy current (debounced): all records and the outbox. */
+  private persist() {
+    clearTimeout(this.persistTimer);
+    this.persistTimer = setTimeout(() => { void this.persistNow(); }, 250);
+  }
+  async persistNow() {
+    clearTimeout(this.persistTimer);
+    const records: LocalRec[] = [...this.recs.values()].map(r => ({ id: r.id, kind: r.kind, sheetId: r.sheetId, data: r.data, seq: r.seq }));
+    try { await saveLocal({ projectId: this.projectId, project: this.project, seq: this.since, records, dirty: [...this.dirty.keys()], savedAt: Date.now() }); } catch { /* private mode / quota: still works online */ }
   }
 
   subscribe = (fn: () => void) => { this.listeners.add(fn); return () => { this.listeners.delete(fn); }; };
@@ -105,7 +131,7 @@ export class EditorStore {
   }
 
   // ---- sync ----
-  private markDirty(id: string) { this.dirty.set(id, ++this.token); this.setState('dirty'); clearTimeout(this.timer); this.timer = setTimeout(() => void this.flush(), 700 * Math.min(8, 1 + this.retry)); }
+  private markDirty(id: string) { this.dirty.set(id, ++this.token); this.persist(); this.setState('dirty'); clearTimeout(this.timer); this.timer = setTimeout(() => void this.flush(), 700 * Math.min(8, 1 + this.retry)); }
   private setState(s: SaveState, err = '') { this.saveState = s; this.lastError = err; }
   get unsaved() { return this.dirty.size > 0; }
 
@@ -125,7 +151,7 @@ export class EditorStore {
         this.conflicts += res.conflicts.length;
       }
       for (const [id, tok] of sent) if (this.dirty.get(id) === tok) this.dirty.delete(id);
-      this.retry = 0; await this.pull();
+      this.retry = 0; this.persist(); await this.pull();
       this.setState(this.dirty.size ? 'dirty' : 'saved');
     } catch (e) {
       const status = (e as { status?: number }).status;
@@ -147,11 +173,11 @@ export class EditorStore {
       this.recs.set(r.id, same ? { ...cur, seq: r.seq } : { id: r.id, kind: r.kind, sheetId: r.sheetId, data: r.data, seq: r.seq, rev: ++revCounter });
       if (!same) changed = true;
     }
-    this.since = res.seq; if (changed) this.emit();
+    this.since = res.seq; this.persist(); if (changed) this.emit();
   }
   /** Poll for other devices' edits while nothing local is waiting. */
   async refresh() { if (!this.dirty.size && !this.flushing) { try { await this.pull(); } catch { /* offline: try again later */ } } }
-  dispose() { clearTimeout(this.timer); }
+  dispose() { clearTimeout(this.timer); if (typeof window !== 'undefined') window.removeEventListener('online', this.onOnline); void this.persistNow(); }
 }
 
 export function useStoreVersion(store: EditorStore) { return useSyncExternalStore(store.subscribe, store.getVersion); }

@@ -53,6 +53,6 @@ HEALTHCHECK --interval=30s --timeout=5s --start-period=20s --retries=3 \
   CMD node -e "fetch('http://127.0.0.1:'+(process.env.PORT||8080)+'/healthz').then(r=>process.exit(r.ok?0:1),()=>process.exit(1))"
 LABEL org.opencontainers.image.title="Fieldplan" \
       org.opencontainers.image.description="Site CAD for low-voltage, electrical, security and smart-home installs" \
-      org.opencontainers.image.source="https://github.com/monoor/fieldplan-app"
+      org.opencontainers.image.source="https://github.com/monoor/fieldplan-app-m4"
 ENTRYPOINT ["/sbin/tini", "--", "fieldplan-entrypoint"]
 CMD ["node", "apps/server/dist/main.js"]

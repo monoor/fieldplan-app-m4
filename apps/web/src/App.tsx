@@ -1,3 +1,4 @@
+import { clearOffline } from './editor/offline';
 import { Navigate, NavLink, Outlet, Route, Routes, useLocation, useNavigate } from 'react-router';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { api, authClient, can, type Me } from './api';
@@ -40,7 +41,7 @@ function Shell() {
   if (status.data?.setupRequired) return <Navigate to="/setup" replace />;
   if (me.isError && !me.isFetching) return <Navigate to={'/login?next=' + encodeURIComponent(loc.pathname)} replace />;
   if (!me.data) return <div className="center muted">Loading…</div>;
-  const signOut = async () => { await authClient.signOut(); qc.clear(); nav('/login'); };
+  const signOut = async () => { await authClient.signOut(); await clearOffline(); qc.clear(); nav('/login'); };
   return (
     <div className="app">
       <header className="topbar">

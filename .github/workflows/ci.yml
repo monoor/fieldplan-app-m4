@@ -1,5 +1,5 @@
 # Type-checks and tests every push and PR. On main (and v* tags) it also builds the Docker image, starts it once as a
-# smoke test, and pushes it to ghcr.io/monoor/fieldplan-app — the image the Unraid template pulls.
+# smoke test, and pushes it to ghcr.io/monoor/fieldplan-app-m4 — the image the Unraid template pulls.
 name: ci
 
 on:
@@ -58,7 +58,7 @@ jobs:
           context: .
           platforms: linux/amd64
           load: true
-          tags: fieldplan-app:ci
+          tags: fieldplan-app-m4:ci
           build-args: |
             NODE_IMAGE=${{ env.NODE_IMAGE }}
             FIELDPLAN_VERSION=${{ steps.ver.outputs.v }}
@@ -72,7 +72,7 @@ jobs:
           docker run -d --name fp -p 8080:8080 -e PUID=99 -e PGID=100 -e CLAUDE_MODEL= -e PUBLIC_URL= \
             --health-interval 5s --read-only --tmpfs /tmp --security-opt no-new-privileges:true \
             --cap-drop ALL --cap-add CHOWN --cap-add SETUID --cap-add SETGID --cap-add DAC_OVERRIDE \
-            -v "$data:/data" fieldplan-app:ci
+            -v "$data:/data" fieldplan-app-m4:ci
           for i in $(seq 1 40); do curl -fsS localhost:8080/healthz >/dev/null 2>&1 && break; sleep 1; done
           docker logs fp 2>&1 | head -40
           if ! curl -fsS localhost:8080/healthz; then

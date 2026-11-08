@@ -14,3 +14,7 @@ createRoot(document.getElementById('root')!).render(
     </QueryClientProvider>
   </StrictMode>,
 );
+
+// Offline app shell. Needs HTTPS (or localhost): browsers refuse service workers on plain http, where edits are still kept
+// on the device but the app itself can't open without a connection.
+if ('serviceWorker' in navigator && import.meta.env.PROD) window.addEventListener('load', () => { navigator.serviceWorker.register('/sw.js').catch(() => undefined); });

@@ -1,0 +1,16 @@
+{
+  "name": "Fieldplan",
+  "short_name": "Fieldplan",
+  "description": "Site CAD for low-voltage, electrical and security installs — works offline on a tablet",
+  "start_url": "/",
+  "scope": "/",
+  "display": "standalone",
+  "orientation": "any",
+  "background_color": "#0b131c",
+  "theme_color": "#0b131c",
+  "icons": [
+    { "src": "/icon-192.png", "sizes": "192x192", "type": "image/png" },
+    { "src": "/icon-512.png", "sizes": "512x512", "type": "image/png", "purpose": "any maskable" },
+    { "src": "/favicon.svg", "sizes": "any", "type": "image/svg+xml" }
+  ]
+}

@@ -1,4 +1,4 @@
-// Lock-out recovery, run on the server:  docker exec -it fieldplan-app node apps/server/dist/cli/reset-password.js you@example.com [new-password] [--no-2fa]
+// Lock-out recovery, run on the server:  docker exec -it fieldplan-app-m4 node apps/server/dist/cli/reset-password.js you@example.com [new-password] [--no-2fa]
 // Without a password one is generated and printed. All of the user's sessions are signed out. --no-2fa also turns off two-factor for them.
 import crypto from 'node:crypto';
 import { loadConfig } from '../config.js';

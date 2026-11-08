@@ -2,7 +2,8 @@ import { useEffect, useMemo, useRef, useState } from 'react';
 import { Link, useNavigate, useParams } from 'react-router';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { newId, type ProjectRecord, type ProjectSummary } from '@fieldplan/shared';
-import { api, can } from '../api';
+import { api, can, ApiError, fileUrl } from '../api';
+import { loadLocal, mergeLocal, type LocalRec } from '../editor/offline';
 import { useMe } from '../App';
 import { EditorStore, useStoreVersion } from '../editor/store';
 import { EditorCanvas, type Placement } from '../editor/EditorCanvas';
@@ -18,19 +19,34 @@ import { modeOf, type Mode, type Tool } from '../editor/tools';
 import type { SceneRec } from '../editor/Scene';
 
 interface Snapshot { project: ProjectSummary; seq: number; records: ProjectRecord[] }
+interface EditorSnapshot { project: ProjectSummary; seq: number; records: LocalRec[]; dirty: string[]; offline: boolean }
+
+/** Server copy plus this device's unsent edits; if the server can't be reached, the copy kept on this device. */
+async function loadSnapshot(id: string): Promise<EditorSnapshot> {
+  const local = await loadLocal(id);
+  try {
+    const net = await api<Snapshot>('/api/projects/' + encodeURIComponent(id) + '/snapshot'), m = mergeLocal(net.records, local);
+    return { project: net.project, seq: net.seq, records: m.records, dirty: m.dirty, offline: false };
+  } catch (e) {
+    if (e instanceof ApiError || !local?.project) throw e;
+    return { project: local.project as ProjectSummary, seq: local.seq, records: local.records, dirty: local.dirty, offline: true };
+  }
+}
 
 export function Editor() {
   const { id = '' } = useParams(), me = useMe().data;
-  const snap = useQuery({ queryKey: ['editor-snapshot', id], queryFn: () => api<Snapshot>('/api/projects/' + encodeURIComponent(id) + '/snapshot'), staleTime: Infinity, gcTime: 0 });
+  const snap = useQuery({ queryKey: ['editor-snapshot', id], queryFn: () => loadSnapshot(id), staleTime: Infinity, gcTime: 0 });
   if (snap.isLoading) return <div className="page muted">Loading…</div>;
   if (snap.isError) return <div className="page"><div className="bad">{snap.error.message}</div></div>;
   if (!can(me, 'project:write')) return <div className="page"><div className="bad">Your role can't edit plans.</div><Link to={'/p/' + id}>Back to the project</Link></div>;
   return <EditorShell key={id} id={id} snapshot={snap.data!} />;
 }
 
-function EditorShell({ id, snapshot }: { id: string; snapshot: Snapshot }) {
+function EditorShell({ id, snapshot }: { id: string; snapshot: EditorSnapshot }) {
   const nav = useNavigate(), qc = useQueryClient();
-  const store = useMemo(() => new EditorStore(id, snapshot), [id, snapshot]);
+  const store = useMemo(() => { const st = new EditorStore(id, snapshot, snapshot.dirty); st.project = snapshot.project; return st; }, [id, snapshot]);
+  const [, netTick] = useState(0);
+  useEffect(() => { const f = () => netTick(n => n + 1); window.addEventListener('online', f); window.addEventListener('offline', f); return () => { window.removeEventListener('online', f); window.removeEventListener('offline', f); }; }, []);
   const version = useStoreVersion(store);
   const [sheetId, setSheet] = useState<string | null>(null);
   const [tool, setTool] = useState<Tool>('select');
@@ -61,6 +77,13 @@ function EditorShell({ id, snapshot }: { id: string; snapshot: Snapshot }) {
   }, [store, qc, id]);
   useEffect(() => { setSel(prev => new Set([...prev].filter(i => store.get(i)))); }, [version, store]);
 
+  // Keep underlay images on the device so the plan still draws with no signal.
+  useEffect(() => { for (const r of store.all()) if (r.kind === 'underlay' && r.data.fileSha) void fetch(fileUrl(r.data.fileSha)).catch(() => undefined); }, [store, version]);
+  const wasOffline = useRef(snapshot.offline);
+  useEffect(() => {
+    if (store.saveState === 'saved' && store.restored > 0) { setMsg('Sent ' + store.restored + ' edit' + (store.restored === 1 ? '' : 's') + ' made offline.'); store.restored = 0; }
+    else if (store.saveState === 'saved' && wasOffline.current && !store.offline) { wasOffline.current = false; void store.refresh(); }
+  }, [store.saveState, version, store]);
   const addSheet = () => { const sid = newId(); store.edit(tx => tx.put({ id: sid, kind: 'sheet', sheetId: null, data: { name: 'Floor ' + (sheets.length + 1), order: sheets.length } })); setSheet(sid); };
   const renameSheet = () => { if (!current) return; const n = prompt('Sheet name', current.data.name)?.trim(); if (n) store.edit(tx => tx.patch(current.id, { name: n.slice(0, 120) })); };
   const deleteSheet = () => { if (!current || sheets.length < 2) return; if (confirm('Delete “' + current.data.name + '” and everything on it?')) { store.edit(tx => tx.del(current.id)); setSheet(null); setSel(new Set()); } };
@@ -103,7 +126,7 @@ function EditorShell({ id, snapshot }: { id: string; snapshot: Snapshot }) {
         <button className={'btn sm' + (issues ? ' warn-btn' : '')} onClick={() => setChecksOpen(true)}>Checks{issues ? ' (' + issues + ')' : ''}</button>
         <span className="spacer" />
         {store.conflicts > 0 && <span className="warn-chip" title="Another device changed the same items; your version was kept">{store.conflicts} overwritten</span>}
-        <span className={'save ' + state} title={store.lastError}>{state === 'saved' ? 'Saved' : state === 'saving' ? 'Saving…' : state === 'dirty' ? 'Unsaved…' : 'Not saved — ' + (store.lastError || 'offline') + ' (retrying)'}</span>
+        <span className={'save ' + (store.offline && state !== 'saved' ? 'error' : state)} title={store.lastError}>{store.offline ? (store.pending ? 'Offline — ' + store.pending + ' change' + (store.pending === 1 ? '' : 's') + ' saved on this device' : 'Offline') : state === 'saved' ? 'Saved' : state === 'saving' ? 'Saving…' : state === 'dirty' ? 'Unsaved…' : 'Not synced — ' + (store.lastError || 'offline') + ' (kept on this device, retrying)'}</span>
       </div>
       {canvasOpen && <CanvasDialog initial={{ canvas, scale, gridFt }} dims={current ? store.ofSheet(current.id).filter(r => r.kind === 'dim' && Array.isArray(r.data.points) && r.data.points.length >= 2) : []}
         onClose={() => setCanvasOpen(false)} onApply={v => store.edit(tx => tx.patch('meta', { ...v }))} />}

@@ -42,7 +42,7 @@ export function Login() {
         {err && <div className="bad">{err}</div>}
         {step === 'password' && <details className="small muted"><summary>Forgot password?</summary>
           <p>There's no email reset (this runs on your own server). Ask an admin: Settings → Users → Reset password. If you're the only admin, run this on the server:</p>
-          <code className="block">docker exec -it fieldplan-app node apps/server/dist/cli/reset-password.js you@example.com</code>
+          <code className="block">docker exec -it fieldplan-app-m4 node apps/server/dist/cli/reset-password.js you@example.com</code>
           <p>It prints a new password (add <code>--no-2fa</code> if you lost your authenticator too).</p></details>}
         <button className="btn primary" disabled={busy}>{busy ? 'Checking…' : step === 'password' ? 'Sign in' : 'Verify'}</button>
       </form>

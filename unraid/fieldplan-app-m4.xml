@@ -1,15 +1,15 @@
 <?xml version="1.0"?>
 <Container version="2">
-  <Name>fieldplan-app</Name>
-  <Repository>ghcr.io/monoor/fieldplan-app:latest</Repository>
-  <Registry>https://github.com/users/monoor/packages/container/package/fieldplan-app</Registry>
+  <Name>fieldplan-app-m4</Name>
+  <Repository>ghcr.io/monoor/fieldplan-app-m4:latest</Repository>
+  <Registry>https://github.com/users/monoor/packages/container/package/fieldplan-app-m4</Registry>
   <Network>bridge</Network>
   <MyIP/>
   <Shell>sh</Shell>
   <Privileged>false</Privileged>
   <Support/>
-  <Project>https://github.com/monoor/fieldplan-app</Project>
-  <Overview>Fieldplan v2 — site CAD for low-voltage, electrical, security and smart-home installs, with user accounts, client share links, an audit log and a device catalog that imports products from vendor pages. Everything is stored in /data (SQLite database, uploaded files, auth secret) — back that folder up. Runs next to Fieldplan v1 on a different port. Open the Web UI once after the first start to create the admin account.</Overview>
+  <Project>https://github.com/monoor/fieldplan-app-m4</Project>
+  <Overview>Fieldplan v2 + M4 (offline tablet PWA) — site CAD for low-voltage, electrical, security and smart-home installs, with user accounts, client share links, an audit log and a device catalog that imports products from vendor pages. Everything is stored in /data (SQLite database, uploaded files, auth secret) — back that folder up. Runs next to Fieldplan v1 on a different port. Open the Web UI once after the first start to create the admin account.</Overview>
   <Category>Productivity: Tools:</Category>
   <WebUI>http://[IP]:[PORT:8080]/</WebUI>
   <TemplateURL/>
@@ -20,8 +20,8 @@
   <DonateText/>
   <DonateLink/>
   <Requires/>
-  <Config Name="Web UI port" Target="8080" Default="6300" Mode="tcp" Description="Host port for the web interface (v1 uses 6301)" Type="Port" Display="always" Required="true" Mask="false">6300</Config>
-  <Config Name="Data" Target="/data" Default="/mnt/user/appdata/fieldplan-app" Mode="rw" Description="Database, uploaded files and the sign-in secret. Back this up." Type="Path" Display="always" Required="true" Mask="false">/mnt/user/appdata/fieldplan-app</Config>
+  <Config Name="Web UI port" Target="8080" Default="6302" Mode="tcp" Description="Host port for the web interface (v1 uses 6301, v2 uses 6300)" Type="Port" Display="always" Required="true" Mask="false">6302</Config>
+  <Config Name="Data" Target="/data" Default="/mnt/user/appdata/fieldplan-app-m4" Mode="rw" Description="Database, uploaded files and the sign-in secret. Back this up." Type="Path" Display="always" Required="true" Mask="false">/mnt/user/appdata/fieldplan-app-m4</Config>
   <Config Name="Anthropic API key" Target="ANTHROPIC_API_KEY" Default="" Mode="" Description="Optional. Lets Claude read product pages and datasheet PDFs during catalog import. Leave empty to turn this off." Type="Variable" Display="always" Required="false" Mask="true"/>
   <Config Name="Public URL" Target="PUBLIC_URL" Default="" Mode="" Description="Only when served through a reverse proxy, e.g. https://plans.example.com (no trailing slash). Leave empty for LAN use." Type="Variable" Display="always" Required="false" Mask="false"/>
   <Config Name="Trust proxy" Target="TRUST_PROXY" Default="" Mode="" Description="Number of reverse proxies in front (usually 1) so client IPs in the audit log are right. Leave empty for LAN use." Type="Variable" Display="advanced" Required="false" Mask="false"/>

@@ -1,12 +1,12 @@
-# docker compose up -d   → http://<host>:6300
+# docker compose up -d   → http://<host>:6302
 services:
   fieldplan:
-    image: ghcr.io/monoor/fieldplan-app:latest
+    image: ghcr.io/monoor/fieldplan-app-m4:latest
     # build: .            # or build locally instead of pulling
-    container_name: fieldplan-app
+    container_name: fieldplan-app-m4
     restart: unless-stopped
     ports:
-      - "6300:8080"
+      - "6302:8080"
     volumes:
       - ./data:/data
     environment:
